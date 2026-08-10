@@ -21,9 +21,11 @@
   (is (= program (gmir/validate! program)))
   (is (= (keyword "kotoba.gmir.vreg" "0") v0)))
 
-(deftest closed-i64-arithmetic-family-is-admitted
+(deftest closed-i64-scalar-family-is-admitted
   (doseq [op [:gmir/add :gmir/subtract :gmir/multiply :gmir/quotient
-              :gmir/bit-and :gmir/bit-or :gmir/bit-xor]]
+              :gmir/bit-and :gmir/bit-or :gmir/bit-xor
+              :gmir/equal :gmir/less-than :gmir/greater-than
+              :gmir/less-or-equal :gmir/greater-or-equal]]
     (is (= op
            (-> {:gmir/version 1
                 :gmir/instructions

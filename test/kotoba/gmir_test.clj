@@ -5,6 +5,8 @@
 (def v0 (gmir/vreg 0))
 (def v1 (gmir/vreg 1))
 (def v2 (gmir/vreg 2))
+(def v3 (gmir/vreg 3))
+(def v4 (gmir/vreg 4))
 
 (def program
   {:gmir/version 1
@@ -57,3 +59,51 @@
                  (gmir/validate! (update program :gmir/instructions conj
                                          {:gmir/op :gmir/label
                                           :gmir/id :test.label/zero}))))))
+
+(def phi-program
+  {:gmir/version 2
+   :gmir/instructions
+   [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+    {:gmir/op :gmir/branch-zero :gmir/test v0 :gmir/target :test.label/else}
+    {:gmir/op :gmir/label :gmir/id :test.label/then}
+    {:gmir/op :gmir/constant :gmir/dst v1 :gmir/value 11}
+    {:gmir/op :gmir/label :gmir/id :test.label/then-exit}
+    {:gmir/op :gmir/jump :gmir/target :test.label/join}
+    {:gmir/op :gmir/label :gmir/id :test.label/else}
+    {:gmir/op :gmir/constant :gmir/dst v2 :gmir/value 22}
+    {:gmir/op :gmir/label :gmir/id :test.label/else-exit}
+    {:gmir/op :gmir/jump :gmir/target :test.label/join}
+    {:gmir/op :gmir/label :gmir/id :test.label/join}
+    {:gmir/op :gmir/phi :gmir/dst v3
+     :gmir/incomings [{:gmir/predecessor :test.label/then-exit :gmir/value v1}
+                      {:gmir/predecessor :test.label/else-exit :gmir/value v2}]}
+    {:gmir/op :gmir/constant :gmir/dst v4 :gmir/value 1}
+    {:gmir/op :gmir/add :gmir/dst (gmir/vreg 5) :gmir/left v3 :gmir/right v4}
+    {:gmir/op :gmir/return :gmir/value (gmir/vreg 5)}]})
+
+(deftest v2-phi-has-explicit-complete-predecessors
+  (is (= phi-program (gmir/validate! phi-program)))
+  (testing "v1 remains closed and cannot acquire v2 operations"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate! (assoc phi-program :gmir/version 1)))))
+  (testing "incoming predecessor sets are exact, unique, and local"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in phi-program [:gmir/instructions 11 :gmir/incomings 1
+                                         :gmir/predecessor]
+                            :test.label/then-exit))))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (update-in phi-program [:gmir/instructions 11 :gmir/incomings] pop)))))
+  (testing "phi is a block-entry operation and rejects fallthrough/critical edges"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (update phi-program :gmir/instructions
+                          #(vec (concat (subvec % 0 11)
+                                        [{:gmir/op :gmir/constant
+                                          :gmir/dst (gmir/vreg 9) :gmir/value 0}]
+                                        (subvec % 11)))))))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in phi-program [:gmir/instructions 1 :gmir/target]
+                            :test.label/join))))))

@@ -7,10 +7,11 @@ between checked KIR lowering and target instruction selection.
 
 ## Owns
 
-- the closed GMIR v1 abstract data model;
+- the closed GMIR v1 abstract data model and versioned GMIR v2 extension;
 - virtual-register and label identity rules;
 - structural validation for arguments, constants, integer arithmetic and
-  comparisons, branches, and returns;
+  comparisons, branches, returns, and v2 block-entry phi values with explicit
+  predecessor jumps;
 - deterministic EDN-shaped in-memory/reference data.
 
 ## Does not own

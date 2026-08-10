@@ -1,7 +1,8 @@
 (ns kotoba.gmir
-  "Closed target-independent Generic Machine IR v1 contract.")
+  "Closed target-independent Generic Machine IR v1/v2 contract.")
 
-(def version 1)
+(def version 2)
+(def supported-versions #{1 2})
 
 (defn- reject! [problem instruction]
   (throw (ex-info (str "GMIR rejected: " (name problem))
@@ -50,19 +51,97 @@
    :gmir/label #{:gmir/op :gmir/id}
    :gmir/branch-zero #{:gmir/op :gmir/test :gmir/target}
    :gmir/jump #{:gmir/op :gmir/target}
+   :gmir/phi #{:gmir/op :gmir/dst :gmir/incomings}
    :gmir/return #{:gmir/op :gmir/value}})
 
+(def ^:private v1-operations
+  (disj (set (keys instruction-keysets)) :gmir/phi))
+
+(def ^:private v2-operations
+  (set (keys instruction-keysets)))
+
+(defn- operations-for [program-version]
+  (case program-version
+    1 v1-operations
+    2 v2-operations
+    #{}))
+
+(defn- phi-incoming? [incoming]
+  (and (map? incoming)
+       (= #{:gmir/predecessor :gmir/value} (set (keys incoming)))
+       (label? (:gmir/predecessor incoming))
+       (vreg? (:gmir/value incoming))))
+
+(defn- preceding-label
+  [instructions index]
+  (loop [cursor (dec index)]
+    (when (not (neg? cursor))
+      (let [instruction (nth instructions cursor)]
+        (cond
+          (= :gmir/label (:gmir/op instruction)) (:gmir/id instruction)
+          (= :gmir/phi (:gmir/op instruction)) (recur (dec cursor))
+          :else nil)))))
+
+(defn- block-label-before
+  [instructions index]
+  (some (fn [cursor]
+          (let [instruction (nth instructions cursor)]
+            (when (= :gmir/label (:gmir/op instruction))
+              (:gmir/id instruction))))
+        (range (dec index) -1 -1)))
+
+(defn- validate-phis!
+  [instructions]
+  (doseq [[index {:gmir/keys [op incomings] :as instruction}]
+          (map-indexed vector instructions)
+          :when (= :gmir/phi op)]
+    (let [join (preceding-label instructions index)
+          incoming-predecessors (mapv :gmir/predecessor incomings)
+          incoming-set (set incoming-predecessors)
+          jump-predecessors
+          (->> instructions
+               (map-indexed vector)
+               (keep (fn [[jump-index candidate]]
+                       (when (and (= :gmir/jump (:gmir/op candidate))
+                                  (= join (:gmir/target candidate)))
+                         (block-label-before instructions jump-index))))
+               set)]
+      (when-not join
+        (reject! :phi-not-at-block-entry instruction))
+      (when-not (and (vector? incomings)
+                     (<= 2 (count incomings))
+                     (every? phi-incoming? incomings)
+                     (= (count incoming-predecessors) (count incoming-set)))
+        (reject! :invalid-phi-incomings instruction))
+      (when-not (= incoming-set jump-predecessors)
+        (reject! :phi-predecessor-mismatch
+                 {:join join :incoming incoming-set :jumps jump-predecessors}))
+      (when (some #(and (= :gmir/branch-zero (:gmir/op %))
+                        (= join (:gmir/target %)))
+                  instructions)
+        (reject! :phi-critical-edge instruction))
+      (let [join-index (.indexOf instructions
+                                 (first (filter #(and (= :gmir/label (:gmir/op %))
+                                                      (= join (:gmir/id %)))
+                                                instructions)))]
+        (when (or (zero? join-index)
+                  (not= :gmir/jump (:gmir/op (nth instructions (dec join-index)))))
+          (reject! :phi-fallthrough-predecessor instruction))))))
+
 (defn validate!
-  "Validate and return a closed `{:gmir/version 1 :gmir/instructions [...]}`."
+  "Validate and return a closed GMIR v1 or v2 program. v2 adds canonical phi
+  nodes whose incoming edges are explicit predecessor jumps."
   [program]
   (when-not (and (map? program)
                  (= #{:gmir/version :gmir/instructions} (set (keys program)))
-                 (= version (:gmir/version program))
+                 (contains? supported-versions (:gmir/version program))
                  (vector? (:gmir/instructions program)))
     (reject! :non-canonical-program program))
   (doseq [instruction (:gmir/instructions program)]
-    (let [op (:gmir/op instruction)]
-      (when-not (= (get instruction-keysets op) (set (keys instruction)))
+    (let [op (:gmir/op instruction)
+          allowed (operations-for (:gmir/version program))]
+      (when-not (and (contains? allowed op)
+                     (= (get instruction-keysets op) (set (keys instruction))))
         (reject! :non-canonical-instruction instruction))
       (doseq [register (keep instruction [:gmir/dst :gmir/left :gmir/right
                                            :gmir/test])]
@@ -70,6 +149,10 @@
           (reject! :invalid-virtual-register instruction)))
       (when (and (= op :gmir/return) (not (vreg? (:gmir/value instruction))))
         (reject! :invalid-virtual-register instruction))
+      (when (= op :gmir/phi)
+        (when-not (and (vector? (:gmir/incomings instruction))
+                       (every? phi-incoming? (:gmir/incomings instruction)))
+          (reject! :invalid-phi-incomings instruction)))
       (when (and (= op :gmir/constant)
                  (not (i64-value? (:gmir/value instruction))))
         (reject! :constant-not-i64 instruction))
@@ -91,5 +174,7 @@
       (reject! :duplicate-label {:labels labels}))
     (doseq [target targets]
       (when-not (contains? label-set target)
-        (reject! :unresolved-target {:target target}))))
+        (reject! :unresolved-target {:target target})))
+    (when (= 2 (:gmir/version program))
+      (validate-phis! instructions)))
   program)

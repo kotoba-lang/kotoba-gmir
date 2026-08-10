@@ -36,6 +36,12 @@
   {:gmir/argument #{:gmir/op :gmir/dst :gmir/index}
    :gmir/constant #{:gmir/op :gmir/dst :gmir/value}
    :gmir/add #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/subtract #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/multiply #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/quotient #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/bit-and #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/bit-or #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/bit-xor #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/label #{:gmir/op :gmir/id}
    :gmir/branch-zero #{:gmir/op :gmir/test :gmir/target}
    :gmir/jump #{:gmir/op :gmir/target}

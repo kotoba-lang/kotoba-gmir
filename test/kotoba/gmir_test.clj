@@ -107,3 +107,67 @@
                  (gmir/validate!
                   (assoc-in phi-program [:gmir/instructions 1 :gmir/target]
                             :test.label/join))))))
+
+(def scalar-call-module
+  {:gmir/version 3
+   :gmir/entry 'main
+   :gmir/functions
+   [{:gmir/name 'add-one
+     :gmir/arity 1
+     :gmir/instructions
+     [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+      {:gmir/op :gmir/constant :gmir/dst v1 :gmir/value 1}
+      {:gmir/op :gmir/add :gmir/dst v2 :gmir/left v0 :gmir/right v1}
+      {:gmir/op :gmir/return :gmir/value v2}]}
+    {:gmir/name 'main
+     :gmir/arity 1
+     :gmir/instructions
+     [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+      {:gmir/op :gmir/call :gmir/dst v1 :gmir/callee 'add-one
+       :gmir/arguments [v0]}
+      {:gmir/op :gmir/add :gmir/dst v2 :gmir/left v0 :gmir/right v1}
+      {:gmir/op :gmir/return :gmir/value v2}]}]})
+
+(deftest v3-owns-function-scopes-and-scalar-direct-calls
+  (is (= scalar-call-module (gmir/validate! scalar-call-module)))
+  (is (gmir/function-id? 'main))
+  (testing "vregs and labels may be reused by distinct function scopes"
+    (is (= v0 (get-in (gmir/validate! scalar-call-module)
+                       [:gmir/functions 1 :gmir/instructions 0 :gmir/dst]))))
+  (testing "v1 and v2 cannot silently acquire calls"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  {:gmir/version 2
+                   :gmir/instructions
+                   [{:gmir/op :gmir/call :gmir/dst v0 :gmir/callee 'f
+                     :gmir/arguments []}]})))))
+
+(deftest v3-call-graph-and-function-boundaries-fail-closed
+  (testing "entry and callee names resolve inside the same module"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate! (assoc scalar-call-module :gmir/entry 'missing))))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in scalar-call-module
+                            [:gmir/functions 1 :gmir/instructions 1 :gmir/callee]
+                            'missing)))))
+  (testing "calls and argument loads match declared arities"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in scalar-call-module
+                            [:gmir/functions 1 :gmir/instructions 1 :gmir/arguments]
+                            []))))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in scalar-call-module
+                            [:gmir/functions 1 :gmir/instructions 0 :gmir/index]
+                            1)))))
+  (testing "function names are unique and each function owns a closed shape"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in scalar-call-module [:gmir/functions 1 :gmir/name]
+                            'add-one))))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in scalar-call-module [:gmir/functions 0 :ambient/policy]
+                            true))))))

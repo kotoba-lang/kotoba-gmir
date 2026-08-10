@@ -1,8 +1,8 @@
 (ns kotoba.gmir
-  "Closed target-independent Generic Machine IR v1/v2 contract.")
+  "Closed target-independent Generic Machine IR contract.")
 
-(def version 2)
-(def supported-versions #{1 2})
+(def version 3)
+(def supported-versions #{1 2 3})
 
 (defn- reject! [problem instruction]
   (throw (ex-info (str "GMIR rejected: " (name problem))
@@ -52,6 +52,7 @@
    :gmir/branch-zero #{:gmir/op :gmir/test :gmir/target}
    :gmir/jump #{:gmir/op :gmir/target}
    :gmir/phi #{:gmir/op :gmir/dst :gmir/incomings}
+   :gmir/call #{:gmir/op :gmir/dst :gmir/callee :gmir/arguments}
    :gmir/return #{:gmir/op :gmir/value}})
 
 (def ^:private v1-operations
@@ -60,11 +61,21 @@
 (def ^:private v2-operations
   (set (keys instruction-keysets)))
 
+(def ^:private v3-operations
+  (set (keys instruction-keysets)))
+
 (defn- operations-for [program-version]
   (case program-version
     1 v1-operations
-    2 v2-operations
+    2 (disj v2-operations :gmir/call)
+    3 v3-operations
     #{}))
+
+(defn function-id?
+  "True for a canonical source-level function identifier. Symbols remain data
+  here; target linkage names are deliberately owned by later layers."
+  [value]
+  (and (symbol? value) (not (empty? (name value)))))
 
 (defn- phi-incoming? [incoming]
   (and (map? incoming)
@@ -128,18 +139,13 @@
                   (not= :gmir/jump (:gmir/op (nth instructions (dec join-index)))))
           (reject! :phi-fallthrough-predecessor instruction))))))
 
-(defn validate!
-  "Validate and return a closed GMIR v1 or v2 program. v2 adds canonical phi
-  nodes whose incoming edges are explicit predecessor jumps."
-  [program]
-  (when-not (and (map? program)
-                 (= #{:gmir/version :gmir/instructions} (set (keys program)))
-                 (contains? supported-versions (:gmir/version program))
-                 (vector? (:gmir/instructions program)))
-    (reject! :non-canonical-program program))
-  (doseq [instruction (:gmir/instructions program)]
+(defn- validate-instructions!
+  [program-version instructions]
+  (when-not (vector? instructions)
+    (reject! :non-canonical-instructions instructions))
+  (doseq [instruction instructions]
     (let [op (:gmir/op instruction)
-          allowed (operations-for (:gmir/version program))]
+          allowed (operations-for program-version)]
       (when-not (and (contains? allowed op)
                      (= (get instruction-keysets op) (set (keys instruction))))
         (reject! :non-canonical-instruction instruction))
@@ -149,6 +155,13 @@
           (reject! :invalid-virtual-register instruction)))
       (when (and (= op :gmir/return) (not (vreg? (:gmir/value instruction))))
         (reject! :invalid-virtual-register instruction))
+      (when (= op :gmir/call)
+        (when-not (and (vreg? (:gmir/dst instruction))
+                       (function-id? (:gmir/callee instruction))
+                       (vector? (:gmir/arguments instruction))
+                       (<= (count (:gmir/arguments instruction)) 5)
+                       (every? vreg? (:gmir/arguments instruction)))
+          (reject! :invalid-call instruction)))
       (when (= op :gmir/phi)
         (when-not (and (vector? (:gmir/incomings instruction))
                        (every? phi-incoming? (:gmir/incomings instruction)))
@@ -166,8 +179,7 @@
                    (:gmir/target instruction))]
           (when-not (label? id)
             (reject! :invalid-label instruction))))))
-  (let [instructions (:gmir/instructions program)
-        labels (map :gmir/id (filter #(= :gmir/label (:gmir/op %)) instructions))
+  (let [labels (map :gmir/id (filter #(= :gmir/label (:gmir/op %)) instructions))
         label-set (set labels)
         targets (keep :gmir/target instructions)]
     (when-not (= (count labels) (count label-set))
@@ -175,6 +187,64 @@
     (doseq [target targets]
       (when-not (contains? label-set target)
         (reject! :unresolved-target {:target target})))
-    (when (= 2 (:gmir/version program))
+    (when (contains? #{2 3} program-version)
       (validate-phis! instructions)))
+  instructions)
+
+(defn- validate-v3-module!
+  [{:gmir/keys [entry functions] :as program}]
+  (when-not (and (= #{:gmir/version :gmir/entry :gmir/functions}
+                    (set (keys program)))
+                 (function-id? entry)
+                 (vector? functions)
+                 (seq functions))
+    (reject! :non-canonical-module program))
+  (let [names (mapv :gmir/name functions)
+        signatures (into {} (map (juxt :gmir/name :gmir/arity) functions))]
+    (when-not (and (every? function-id? names)
+                   (= (count names) (count (distinct names))))
+      (reject! :invalid-function-names names))
+    (when-not (contains? signatures entry)
+      (reject! :missing-entry-function {:entry entry}))
+    (doseq [{:gmir/keys [name arity instructions] :as function} functions]
+      (when-not (and (= #{:gmir/name :gmir/arity :gmir/instructions}
+                        (set (keys function)))
+                     (function-id? name)
+                     (integer? arity)
+                     (<= 0 arity 5))
+        (reject! :non-canonical-function function))
+      (validate-instructions! 3 instructions)
+      (let [argument-indices (mapv :gmir/index
+                                   (filter #(= :gmir/argument (:gmir/op %))
+                                           instructions))]
+        (when-not (and (every? #(< % arity) argument-indices)
+                       (= (count argument-indices)
+                          (count (distinct argument-indices))))
+          (reject! :invalid-function-arguments
+                   {:function name :arity arity :indices argument-indices})))
+      (doseq [{:gmir/keys [callee arguments] :as call}
+              (filter #(= :gmir/call (:gmir/op %)) instructions)]
+        (let [callee-arity (get signatures callee ::missing)]
+          (when (= ::missing callee-arity)
+            (reject! :unresolved-callee call))
+          (when-not (= callee-arity (count arguments))
+            (reject! :call-arity-mismatch
+                     {:function name :call call :expected callee-arity}))))))
+  program)
+
+(defn validate!
+  "Validate and return a closed GMIR program. v1 is scalar/control, v2 adds
+  phi values, and v3 owns a non-empty function module with bounded scalar
+  direct calls. Labels and virtual registers remain function-local."
+  [program]
+  (when-not (and (map? program)
+                 (contains? supported-versions (:gmir/version program)))
+    (reject! :non-canonical-program program))
+  (if (= 3 (:gmir/version program))
+    (validate-v3-module! program)
+    (do
+      (when-not (= #{:gmir/version :gmir/instructions} (set (keys program)))
+        (reject! :non-canonical-program program))
+      (validate-instructions! (:gmir/version program) (:gmir/instructions program))
+      program))
   program)

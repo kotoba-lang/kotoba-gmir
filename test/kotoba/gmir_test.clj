@@ -21,6 +21,19 @@
   (is (= program (gmir/validate! program)))
   (is (= (keyword "kotoba.gmir.vreg" "0") v0)))
 
+(deftest closed-i64-arithmetic-family-is-admitted
+  (doseq [op [:gmir/add :gmir/subtract :gmir/multiply :gmir/quotient
+              :gmir/bit-and :gmir/bit-or :gmir/bit-xor]]
+    (is (= op
+           (-> {:gmir/version 1
+                :gmir/instructions
+                [{:gmir/op :gmir/constant :gmir/dst v0 :gmir/value 6}
+                 {:gmir/op :gmir/constant :gmir/dst v1 :gmir/value 3}
+                 {:gmir/op op :gmir/dst v2 :gmir/left v0 :gmir/right v1}
+                 {:gmir/op :gmir/return :gmir/value v2}]}
+               gmir/validate!
+               (get-in [:gmir/instructions 2 :gmir/op]))))))
+
 (deftest contract-fails-closed
   (testing "unknown operations and extra fields"
     (is (thrown? clojure.lang.ExceptionInfo

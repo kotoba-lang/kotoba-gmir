@@ -79,6 +79,7 @@
    :gmir/jump #{:gmir/op :gmir/target}
    :gmir/phi #{:gmir/op :gmir/dst :gmir/incomings}
    :gmir/call #{:gmir/op :gmir/dst :gmir/callee :gmir/arguments}
+   :gmir/runtime-call #{:gmir/op :gmir/dst :gmir/runtime :gmir/arguments}
    :gmir/return #{:gmir/op :gmir/value}})
 
 (def ^:private v1-operations
@@ -102,6 +103,29 @@
   here; target linkage names are deliberately owned by later layers."
   [value]
   (and (symbol? value) (not (empty? (name value)))))
+
+(def runtime-operation-arities
+  "Closed target-independent host-runtime operation contract. The runtime
+  operation names and arities are semantic; target context-table offsets and
+  calling conventions remain owned by MIR/codegen."
+  {:pair 2
+   :pair-first 1
+   :pair-second 1
+   :kgraph-assert! 3
+   :kgraph-get 2
+   :kgraph-count 1
+   :kgraph-entity-at 2
+   :string-byte-length 1
+   :string=? 2
+   :string-concat 2
+   :string-substring 3
+   :string-code-point-at 2
+   :vector-new-empty 0
+   :vector-conj 2
+   :vector-count 1
+   :vector-at 2
+   :vector-assoc 3
+   :vector-drop 2})
 
 (defn- phi-incoming? [incoming]
   (and (map? incoming)
@@ -194,6 +218,16 @@
                        (<= (count (:gmir/arguments instruction)) 5)
                        (every? vreg? (:gmir/arguments instruction)))
           (reject! :invalid-call instruction)))
+      (when (= op :gmir/runtime-call)
+        (let [runtime (:gmir/runtime instruction)
+              arguments (:gmir/arguments instruction)
+              expected (get runtime-operation-arities runtime ::missing)]
+          (when-not (and (vreg? (:gmir/dst instruction))
+                         (not= ::missing expected)
+                         (vector? arguments)
+                         (= expected (count arguments))
+                         (every? vreg? arguments))
+            (reject! :invalid-runtime-call instruction))))
       (when (= op :gmir/phi)
         (when-not (and (vector? (:gmir/incomings instruction))
                        (every? phi-incoming? (:gmir/incomings instruction)))

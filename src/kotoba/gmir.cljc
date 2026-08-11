@@ -59,6 +59,16 @@
    :gmir/f64-greater-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/f64-greater-or-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/f64-unordered #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/kernel-load-u8 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                          :gmir/index :gmir/maximum}
+   :gmir/kernel-store-u8 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/kernel-load-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/maximum}
+   :gmir/kernel-store-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                            :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/kernel-subregion #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                            :gmir/offset :gmir/size}
    :gmir/equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/less-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/greater-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -166,9 +176,15 @@
                      (= (get instruction-keysets op) (set (keys instruction))))
         (reject! :non-canonical-instruction instruction))
       (doseq [register (keep instruction [:gmir/dst :gmir/input :gmir/left
-                                           :gmir/right :gmir/test])]
+                                           :gmir/right :gmir/test :gmir/base
+                                           :gmir/length :gmir/stored
+                                           :gmir/offset :gmir/size])]
         (when-not (vreg? register)
           (reject! :invalid-virtual-register instruction)))
+      (when (and (contains? #{:gmir/kernel-load-u8 :gmir/kernel-store-u8
+                              :gmir/kernel-load-u32 :gmir/kernel-store-u32} op)
+                 (not (vreg? (:gmir/index instruction))))
+        (reject! :invalid-virtual-register instruction))
       (when (and (= op :gmir/return) (not (vreg? (:gmir/value instruction))))
         (reject! :invalid-virtual-register instruction))
       (when (= op :gmir/call)
@@ -189,6 +205,15 @@
                  (not (and (integer? (:gmir/index instruction))
                            (not (neg? (:gmir/index instruction))))))
         (reject! :argument-index-invalid instruction))
+      (when (contains? #{:gmir/kernel-load-u8 :gmir/kernel-store-u8} op)
+        (when-not (contains? #{512 4096 16384} (:gmir/maximum instruction))
+          (reject! :invalid-kernel-memory-maximum instruction))
+        (when (and (= op :gmir/kernel-store-u8)
+                   (= 16384 (:gmir/maximum instruction)))
+          (reject! :invalid-kernel-memory-maximum instruction)))
+      (when (contains? #{:gmir/kernel-load-u32 :gmir/kernel-store-u32} op)
+        (when-not (= 512 (:gmir/maximum instruction))
+          (reject! :invalid-kernel-memory-maximum instruction)))
       (when (contains? #{:gmir/label :gmir/branch-zero :gmir/jump} op)
         (let [id (if (= op :gmir/label)
                    (:gmir/id instruction)

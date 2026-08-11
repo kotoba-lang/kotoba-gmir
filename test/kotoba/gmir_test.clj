@@ -64,6 +64,39 @@
              gmir/validate!
              (get-in [:gmir/instructions 1 :gmir/op])))))
 
+(deftest bounded-kernel-memory-family-is-admitted
+  (let [constants (mapv (fn [register value]
+                          {:gmir/op :gmir/constant :gmir/dst register
+                           :gmir/value value})
+                        [v0 v1 v2 v3] [4096 512 3 42])]
+    (doseq [instruction
+            [{:gmir/op :gmir/kernel-load-u8 :gmir/dst v4
+              :gmir/base v0 :gmir/length v1 :gmir/index v2 :gmir/maximum 512}
+             {:gmir/op :gmir/kernel-store-u8 :gmir/dst v4
+              :gmir/base v0 :gmir/length v1 :gmir/index v2 :gmir/stored v3
+              :gmir/maximum 4096}
+             {:gmir/op :gmir/kernel-load-u32 :gmir/dst v4
+              :gmir/base v0 :gmir/length v1 :gmir/index v2 :gmir/maximum 512}
+             {:gmir/op :gmir/kernel-store-u32 :gmir/dst v4
+              :gmir/base v0 :gmir/length v1 :gmir/index v2 :gmir/stored v3
+              :gmir/maximum 512}
+             {:gmir/op :gmir/kernel-subregion :gmir/dst v4
+              :gmir/base v0 :gmir/length v1 :gmir/offset v2 :gmir/size v3}]]
+      (let [candidate {:gmir/version 1
+                       :gmir/instructions
+                       (conj constants instruction
+                             {:gmir/op :gmir/return :gmir/value v4})}]
+        (is (= candidate (gmir/validate! candidate))))))
+  (testing "profile maxima are part of the closed operation contract"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  {:gmir/version 1
+                   :gmir/instructions
+                   [{:gmir/op :gmir/kernel-load-u8 :gmir/dst v3
+                     :gmir/base v0 :gmir/length v1 :gmir/index v2
+                     :gmir/maximum 513}
+                    {:gmir/op :gmir/return :gmir/value v3}]})))))
+
 (deftest contract-fails-closed
   (testing "unknown operations and extra fields"
     (is (thrown? clojure.lang.ExceptionInfo

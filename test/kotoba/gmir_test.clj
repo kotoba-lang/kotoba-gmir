@@ -251,6 +251,28 @@
                     (assoc-in program [:gmir/instructions 1 :gmir/arguments]
                               [])))))))
 
+(deftest x86-privileged-actions-have-a-closed-contract
+  (let [instructions
+        [{:gmir/op :gmir/constant :gmir/dst v0 :gmir/value 1}
+         {:gmir/op :gmir/constant :gmir/dst v1 :gmir/value 2}
+         {:gmir/op :gmir/x86-privileged :gmir/dst v2
+          :gmir/action :write-msr :gmir/arguments [v0 v1]}
+         {:gmir/op :gmir/return :gmir/value v2}]
+        program {:gmir/version 3 :gmir/entry 'main
+                 :gmir/functions [{:gmir/name 'main :gmir/arity 0
+                                   :gmir/instructions instructions}]}]
+    (is (= program (gmir/validate! program)))
+    (is (= 2 (:write-msr gmir/x86-privileged-action-arities)))
+    (doseq [malformed [(assoc-in program [:gmir/functions 0 :gmir/instructions 2
+                                          :gmir/action] :unknown)
+                       (update-in program [:gmir/functions 0 :gmir/instructions 2
+                                           :gmir/arguments] pop)
+                       (assoc-in program [:gmir/functions 0 :gmir/instructions 2
+                                          :gmir/ambient-policy] true)]]
+      (is (thrown? clojure.lang.ExceptionInfo (gmir/validate! malformed))))
+    (is (= {:gmir/version 1 :gmir/instructions instructions}
+           (gmir/validate! {:gmir/version 1 :gmir/instructions instructions})))))
+
 (deftest immutable-data-addresses-carry-closed-utf8-content
   (let [program {:gmir/version 1
                  :gmir/instructions

@@ -81,6 +81,7 @@
    :gmir/phi #{:gmir/op :gmir/dst :gmir/incomings}
    :gmir/call #{:gmir/op :gmir/dst :gmir/callee :gmir/arguments}
    :gmir/runtime-call #{:gmir/op :gmir/dst :gmir/runtime :gmir/arguments}
+   :gmir/x86-privileged #{:gmir/op :gmir/dst :gmir/action :gmir/arguments}
    :gmir/capability-call #{:gmir/op :gmir/dst :gmir/capability
                            :gmir/kind :gmir/arguments}
    :gmir/return #{:gmir/op :gmir/value}})
@@ -129,6 +130,16 @@
    :vector-at 2
    :vector-assoc 3
    :vector-drop 2})
+
+(def x86-privileged-action-arities
+  "Closed x86-64 kernel instruction family. These actions are semantic at
+  GMIR; MIR owns target admission and rejects them for every other target."
+  {:boot-info 0
+   :read-cr2 0 :read-cr3 0 :write-cr3 1 :invlpg 1
+   :cli 0 :sti 0 :hlt 0 :pause 0
+   :out-u8 2 :out-u32 2 :in-u8 1 :in-u32 1
+   :read-msr 1 :write-msr 2
+   :cpuid-eax 2 :cpuid-ebx 2 :cpuid-ecx 2 :cpuid-edx 2})
 
 (def capability-kinds
   "Closed native capability boundary. Zero is the scalar callback profile;
@@ -236,6 +247,16 @@
                          (= expected (count arguments))
                          (every? vreg? arguments))
             (reject! :invalid-runtime-call instruction))))
+      (when (= op :gmir/x86-privileged)
+        (let [action (:gmir/action instruction)
+              arguments (:gmir/arguments instruction)
+              expected (get x86-privileged-action-arities action ::missing)]
+          (when-not (and (vreg? (:gmir/dst instruction))
+                         (not= ::missing expected)
+                         (vector? arguments)
+                         (= expected (count arguments))
+                         (every? vreg? arguments))
+            (reject! :invalid-x86-privileged instruction))))
       (when (= op :gmir/capability-call)
         (when-not (and (vreg? (:gmir/dst instruction))
                        (vector? (:gmir/arguments instruction))

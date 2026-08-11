@@ -80,6 +80,8 @@
    :gmir/phi #{:gmir/op :gmir/dst :gmir/incomings}
    :gmir/call #{:gmir/op :gmir/dst :gmir/callee :gmir/arguments}
    :gmir/runtime-call #{:gmir/op :gmir/dst :gmir/runtime :gmir/arguments}
+   :gmir/capability-call #{:gmir/op :gmir/dst :gmir/capability
+                           :gmir/kind :gmir/arguments}
    :gmir/return #{:gmir/op :gmir/value}})
 
 (def ^:private v1-operations
@@ -126,6 +128,11 @@
    :vector-at 2
    :vector-assoc 3
    :vector-drop 2})
+
+(def capability-kinds
+  "Closed native capability boundary. Zero is the scalar callback profile;
+  positive values are the typed host ABI discriminator."
+  {:i64 0 :string 1 :option-i64 2 :result-i64 3})
 
 (defn- phi-incoming? [incoming]
   (and (map? incoming)
@@ -228,6 +235,15 @@
                          (= expected (count arguments))
                          (every? vreg? arguments))
             (reject! :invalid-runtime-call instruction))))
+      (when (= op :gmir/capability-call)
+        (when-not (and (vreg? (:gmir/dst instruction))
+                       (vector? (:gmir/arguments instruction))
+                       (= 1 (count (:gmir/arguments instruction)))
+                       (vreg? (first (:gmir/arguments instruction)))
+                       (integer? (:gmir/capability instruction))
+                       (<= 0 (:gmir/capability instruction) 255)
+                       (contains? capability-kinds (:gmir/kind instruction)))
+          (reject! :invalid-capability-call instruction)))
       (when (= op :gmir/phi)
         (when-not (and (vector? (:gmir/incomings instruction))
                        (every? phi-incoming? (:gmir/incomings instruction)))

@@ -250,3 +250,20 @@
                    (gmir/validate!
                     (assoc-in program [:gmir/instructions 1 :gmir/arguments]
                               [])))))))
+
+(deftest capability-calls-close-the-id-and-typed-boundary
+  (let [program {:gmir/version 1
+                 :gmir/instructions
+                 [{:gmir/op :gmir/constant :gmir/dst v0 :gmir/value 9}
+                  {:gmir/op :gmir/capability-call :gmir/dst v1
+                   :gmir/capability 7 :gmir/kind :result-i64
+                   :gmir/arguments [v0]}
+                  {:gmir/op :gmir/return :gmir/value v1}]}]
+    (is (= program (gmir/validate! program)))
+    (is (= 3 (:result-i64 gmir/capability-kinds)))
+    (doseq [[path value] [[[:gmir/instructions 1 :gmir/capability] 256]
+                          [[:gmir/instructions 1 :gmir/capability] -1]
+                          [[:gmir/instructions 1 :gmir/kind] :ambient-object]]]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (gmir/validate! (assoc-in program path value)))
+          [path value]))))

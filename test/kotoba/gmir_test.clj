@@ -251,6 +251,18 @@
                     (assoc-in program [:gmir/instructions 1 :gmir/arguments]
                               [])))))))
 
+(deftest immutable-data-addresses-carry-closed-utf8-content
+  (let [program {:gmir/version 1
+                 :gmir/instructions
+                 [{:gmir/op :gmir/data-address :gmir/dst v0
+                   :gmir/content "hello😀"}
+                  {:gmir/op :gmir/return :gmir/value v0}]}]
+    (is (= program (gmir/validate! program)))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in program [:gmir/instructions 0 :gmir/content]
+                            [:ambient "bytes"]))))))
+
 (deftest capability-calls-close-the-id-and-typed-boundary
   (let [program {:gmir/version 1
                  :gmir/instructions

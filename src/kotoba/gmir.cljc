@@ -36,6 +36,7 @@
 (def instruction-keysets
   {:gmir/argument #{:gmir/op :gmir/dst :gmir/index}
    :gmir/constant #{:gmir/op :gmir/dst :gmir/value}
+   :gmir/data-address #{:gmir/op :gmir/dst :gmir/content}
    :gmir/add #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/subtract #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/multiply #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -251,6 +252,9 @@
       (when (and (= op :gmir/constant)
                  (not (i64-value? (:gmir/value instruction))))
         (reject! :constant-not-i64 instruction))
+      (when (and (= op :gmir/data-address)
+                 (not (string? (:gmir/content instruction))))
+        (reject! :invalid-data-content instruction))
       (when (and (= op :gmir/argument)
                  (not (and (integer? (:gmir/index instruction))
                            (not (neg? (:gmir/index instruction))))))

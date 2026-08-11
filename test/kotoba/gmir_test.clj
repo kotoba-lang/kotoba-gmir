@@ -26,6 +26,8 @@
 (deftest closed-i64-scalar-family-is-admitted
   (doseq [op [:gmir/add :gmir/subtract :gmir/multiply :gmir/quotient
               :gmir/bit-and :gmir/bit-or :gmir/bit-xor
+              :gmir/shift-left :gmir/shift-right-signed
+              :gmir/shift-right-unsigned
               :gmir/equal :gmir/less-than :gmir/greater-than
               :gmir/less-or-equal :gmir/greater-or-equal]]
     (is (= op

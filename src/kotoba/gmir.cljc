@@ -43,6 +43,9 @@
    :gmir/bit-and #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/bit-or #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/bit-xor #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/shift-left #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/shift-right-signed #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/shift-right-unsigned #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/less-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/greater-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}

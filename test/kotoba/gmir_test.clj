@@ -40,6 +40,30 @@
                gmir/validate!
                (get-in [:gmir/instructions 2 :gmir/op]))))))
 
+(deftest closed-f64-bit-pattern-family-is-admitted
+  (doseq [op [:gmir/f64-add :gmir/f64-subtract :gmir/f64-multiply
+              :gmir/f64-divide :gmir/f64-min :gmir/f64-max
+              :gmir/f64-equal :gmir/f64-less-than :gmir/f64-less-or-equal
+              :gmir/f64-greater-than :gmir/f64-greater-or-equal
+              :gmir/f64-unordered]]
+    (is (= op
+           (-> {:gmir/version 1
+                :gmir/instructions
+                [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+                 {:gmir/op :gmir/argument :gmir/dst v1 :gmir/index 1}
+                 {:gmir/op op :gmir/dst v2 :gmir/left v0 :gmir/right v1}
+                 {:gmir/op :gmir/return :gmir/value v2}]}
+               gmir/validate!
+               (get-in [:gmir/instructions 2 :gmir/op])))))
+  (is (= :gmir/f64-sqrt
+         (-> {:gmir/version 1
+              :gmir/instructions
+              [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+               {:gmir/op :gmir/f64-sqrt :gmir/dst v1 :gmir/input v0}
+               {:gmir/op :gmir/return :gmir/value v1}]}
+             gmir/validate!
+             (get-in [:gmir/instructions 1 :gmir/op])))))
+
 (deftest contract-fails-closed
   (testing "unknown operations and extra fields"
     (is (thrown? clojure.lang.ExceptionInfo

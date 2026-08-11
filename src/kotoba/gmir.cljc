@@ -46,6 +46,19 @@
    :gmir/shift-left #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/shift-right-signed #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/shift-right-unsigned #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-add #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-subtract #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-multiply #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-divide #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-min #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-max #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-sqrt #{:gmir/op :gmir/dst :gmir/input}
+   :gmir/f64-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-less-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-less-or-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-greater-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-greater-or-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f64-unordered #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/less-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/greater-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -152,8 +165,8 @@
       (when-not (and (contains? allowed op)
                      (= (get instruction-keysets op) (set (keys instruction))))
         (reject! :non-canonical-instruction instruction))
-      (doseq [register (keep instruction [:gmir/dst :gmir/left :gmir/right
-                                           :gmir/test])]
+      (doseq [register (keep instruction [:gmir/dst :gmir/input :gmir/left
+                                           :gmir/right :gmir/test])]
         (when-not (vreg? register)
           (reject! :invalid-virtual-register instruction)))
       (when (and (= op :gmir/return) (not (vreg? (:gmir/value instruction))))

@@ -136,6 +136,7 @@
   "Closed x86-64 kernel instruction family. These actions are semantic at
   GMIR; MIR owns target admission and rejects them for every other target."
   {:boot-info 0
+   :read-cr0 0 :write-cr0 1
    :read-cr2 0 :read-cr3 0 :write-cr3 1 :invlpg 1
    :cli 0 :sti 0 :hlt 0 :pause 0
    :out-u8 2 :out-u32 2 :in-u8 1 :in-u32 1

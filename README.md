@@ -14,14 +14,14 @@ between checked KIR lowering and target instruction selection.
   returns, and v2 block-entry
   phi values with explicit predecessor jumps;
 - v3 function ownership, module-local scalar direct calls, entry/callee and
-  arity validation;
+  arity validation, plus the closed semantic x86 privileged-action family;
 - deterministic EDN-shaped in-memory/reference data.
 
 ## Does not own
 
 - source parsing or semantic analysis;
 - KIR-to-GMIR lowering policy;
-- target instruction selection or physical registers;
+- target instruction selection, target admission, or physical registers;
 - instruction encoding, machine bytes, or object formats.
 
 GMIR is an abstract data contract. EDN is its reference notation; printed EDN

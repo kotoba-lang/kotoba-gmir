@@ -201,6 +201,24 @@
                    [{:gmir/op :gmir/call :gmir/dst v0 :gmir/callee 'f
                      :gmir/arguments []}]})))))
 
+(deftest v3-owns-terminal-tail-calls
+  (let [module (-> scalar-call-module
+                   (assoc-in [:gmir/functions 1 :gmir/instructions]
+                             [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+                              {:gmir/op :gmir/tail-call :gmir/callee 'add-one
+                               :gmir/arguments [v0]}]))]
+    (is (= module (gmir/validate! module)))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in module
+                            [:gmir/functions 1 :gmir/instructions 1 :gmir/dst]
+                            v1))))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (gmir/validate!
+                  (assoc-in module
+                            [:gmir/functions 1 :gmir/instructions 1 :gmir/callee]
+                            'missing))))))
+
 (deftest v3-call-graph-and-function-boundaries-fail-closed
   (testing "entry and callee names resolve inside the same module"
     (is (thrown? clojure.lang.ExceptionInfo

@@ -80,6 +80,7 @@
    :gmir/jump #{:gmir/op :gmir/target}
    :gmir/phi #{:gmir/op :gmir/dst :gmir/incomings}
    :gmir/call #{:gmir/op :gmir/dst :gmir/callee :gmir/arguments}
+   :gmir/tail-call #{:gmir/op :gmir/callee :gmir/arguments}
    :gmir/runtime-call #{:gmir/op :gmir/dst :gmir/runtime :gmir/arguments}
    :gmir/x86-privileged #{:gmir/op :gmir/dst :gmir/action :gmir/arguments}
    :gmir/capability-call #{:gmir/op :gmir/dst :gmir/capability
@@ -87,7 +88,7 @@
    :gmir/return #{:gmir/op :gmir/value}})
 
 (def ^:private v1-operations
-  (disj (set (keys instruction-keysets)) :gmir/phi))
+  (disj (set (keys instruction-keysets)) :gmir/phi :gmir/tail-call))
 
 (def ^:private v2-operations
   (set (keys instruction-keysets)))
@@ -98,7 +99,7 @@
 (defn- operations-for [program-version]
   (case program-version
     1 v1-operations
-    2 (disj v2-operations :gmir/call)
+    2 (disj v2-operations :gmir/call :gmir/tail-call)
     3 v3-operations
     #{}))
 
@@ -230,8 +231,9 @@
         (reject! :invalid-virtual-register instruction))
       (when (and (= op :gmir/return) (not (vreg? (:gmir/value instruction))))
         (reject! :invalid-virtual-register instruction))
-      (when (= op :gmir/call)
-        (when-not (and (vreg? (:gmir/dst instruction))
+      (when (contains? #{:gmir/call :gmir/tail-call} op)
+        (when-not (and (or (= op :gmir/tail-call)
+                           (vreg? (:gmir/dst instruction)))
                        (function-id? (:gmir/callee instruction))
                        (vector? (:gmir/arguments instruction))
                        (<= (count (:gmir/arguments instruction)) 5)
@@ -339,7 +341,8 @@
           (reject! :invalid-function-arguments
                    {:function name :arity arity :indices argument-indices})))
       (doseq [{:gmir/keys [callee arguments] :as call}
-              (filter #(= :gmir/call (:gmir/op %)) instructions)]
+              (filter #(contains? #{:gmir/call :gmir/tail-call}
+                                   (:gmir/op %)) instructions)]
         (let [callee-arity (get signatures callee ::missing)]
           (when (= ::missing callee-arity)
             (reject! :unresolved-callee call))

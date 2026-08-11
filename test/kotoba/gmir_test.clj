@@ -230,3 +230,23 @@
                  (gmir/validate!
                   (assoc-in scalar-call-module [:gmir/functions 0 :ambient/policy]
                             true))))))
+
+(deftest runtime-calls-have-a-closed-operation-and-arity-contract
+  (let [program {:gmir/version 1
+                 :gmir/instructions
+                 [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+                  {:gmir/op :gmir/runtime-call :gmir/dst v1
+                   :gmir/runtime :vector-count :gmir/arguments [v0]}
+                  {:gmir/op :gmir/return :gmir/value v1}]}]
+    (is (= program (gmir/validate! program)))
+    (is (= 3 (:kgraph-assert! gmir/runtime-operation-arities)))
+    (testing "unknown runtime operations fail closed"
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (gmir/validate!
+                    (assoc-in program [:gmir/instructions 1 :gmir/runtime]
+                              :ambient-host-call)))))
+    (testing "the semantic operation owns its exact arity"
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (gmir/validate!
+                    (assoc-in program [:gmir/instructions 1 :gmir/arguments]
+                              [])))))))

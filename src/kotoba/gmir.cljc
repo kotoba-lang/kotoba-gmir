@@ -138,6 +138,8 @@
   {:boot-info 0
    :read-cr0 0 :write-cr0 1
    :read-cr2 0 :read-cr3 0 :write-cr3 1 :invlpg 1
+   :read-cs 0 :page-fault-handler-address 0 :load-idt 2
+   :probe-guard-write 0 :probe-text-write 0 :probe-nx-execute 0
    :cli 0 :sti 0 :hlt 0 :pause 0
    :out-u8 2 :out-u32 2 :in-u8 1 :in-u32 1
    :read-msr 1 :write-msr 2

@@ -284,14 +284,18 @@
     (is (= {:read-cs 0 :page-fault-handler-address 0
             :page-fault-recovery-handler-address 0
             :configure-page-fault-recovery 2 :load-idt 2
+            :double-fault-handler-address 0
+            :configure-double-fault-ist 2 :load-gdt-tss 2
             :probe-guard-write 0 :probe-text-write 0 :probe-nx-execute 0
-            :probe-recoverable-guard-write 0}
+            :probe-recoverable-guard-write 0 :probe-double-fault 0}
            (select-keys gmir/x86-privileged-action-arities
                         [:read-cs :page-fault-handler-address
                          :page-fault-recovery-handler-address
                          :configure-page-fault-recovery :load-idt
+                         :double-fault-handler-address
+                         :configure-double-fault-ist :load-gdt-tss
                          :probe-guard-write :probe-text-write :probe-nx-execute
-                         :probe-recoverable-guard-write])))
+                         :probe-recoverable-guard-write :probe-double-fault])))
     (doseq [malformed [(assoc-in program [:gmir/functions 0 :gmir/instructions 2
                                           :gmir/action] :unknown)
                        (update-in program [:gmir/functions 0 :gmir/instructions 2

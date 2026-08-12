@@ -141,8 +141,10 @@
    :read-cs 0 :page-fault-handler-address 0
    :page-fault-recovery-handler-address 0
    :configure-page-fault-recovery 2 :load-idt 2
+   :double-fault-handler-address 0
+   :configure-double-fault-ist 2 :load-gdt-tss 2
    :probe-guard-write 0 :probe-text-write 0 :probe-nx-execute 0
-   :probe-recoverable-guard-write 0
+   :probe-recoverable-guard-write 0 :probe-double-fault 0
    :cli 0 :sti 0 :hlt 0 :pause 0
    :out-u8 2 :out-u32 2 :in-u8 1 :in-u32 1
    :read-msr 1 :write-msr 2

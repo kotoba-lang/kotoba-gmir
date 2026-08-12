@@ -281,6 +281,11 @@
                                    :gmir/instructions instructions}]}]
     (is (= program (gmir/validate! program)))
     (is (= 2 (:write-msr gmir/x86-privileged-action-arities)))
+    (is (= {:read-cs 0 :page-fault-handler-address 0 :load-idt 2
+            :probe-guard-write 0 :probe-text-write 0 :probe-nx-execute 0}
+           (select-keys gmir/x86-privileged-action-arities
+                        [:read-cs :page-fault-handler-address :load-idt
+                         :probe-guard-write :probe-text-write :probe-nx-execute])))
     (doseq [malformed [(assoc-in program [:gmir/functions 0 :gmir/instructions 2
                                           :gmir/action] :unknown)
                        (update-in program [:gmir/functions 0 :gmir/instructions 2

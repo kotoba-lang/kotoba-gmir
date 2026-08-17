@@ -329,6 +329,7 @@
     (is (= program (gmir/validate! program)))
     (is (= 3 (:result-i64 gmir/capability-kinds)))
     (is (= 4 (:clock-v1 gmir/capability-kinds)))
+    (is (= 5 (:dataspace-v1 gmir/capability-kinds)))
     (doseq [[path value] [[[:gmir/instructions 1 :gmir/capability] 256]
                           [[:gmir/instructions 1 :gmir/capability] -1]
                           [[:gmir/instructions 1 :gmir/kind] :ambient-object]]]

@@ -68,6 +68,15 @@
                            :gmir/index :gmir/maximum}
    :gmir/kernel-store-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
                             :gmir/index :gmir/stored :gmir/maximum}
+   ;; The lock pair carries exactly the load's fields: it reads and writes one
+   ;; u32 at `index`, and the value it produces is whether this caller won.
+   ;; `:gmir/stored` is deliberately absent -- what gets stored is fixed by the
+   ;; operation (1 to acquire, 0 to release), not supplied by the guest, which
+   ;; is the whole difference between a lock and a compare-exchange.
+   :gmir/kernel-try-lock-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                               :gmir/index :gmir/maximum}
+   :gmir/kernel-unlock-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                             :gmir/index :gmir/maximum}
    :gmir/kernel-subregion #{:gmir/op :gmir/dst :gmir/base :gmir/length
                             :gmir/offset :gmir/size}
    :gmir/equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -234,7 +243,8 @@
         (when-not (vreg? register)
           (reject! :invalid-virtual-register instruction)))
       (when (and (contains? #{:gmir/kernel-load-u8 :gmir/kernel-store-u8
-                              :gmir/kernel-load-u32 :gmir/kernel-store-u32} op)
+                              :gmir/kernel-load-u32 :gmir/kernel-store-u32
+                              :gmir/kernel-try-lock-u32 :gmir/kernel-unlock-u32} op)
                  (not (vreg? (:gmir/index instruction))))
         (reject! :invalid-virtual-register instruction))
       (when (and (= op :gmir/return) (not (vreg? (:gmir/value instruction))))
@@ -298,6 +308,15 @@
           (reject! :invalid-kernel-memory-maximum instruction)))
       (when (contains? #{:gmir/kernel-load-u32 :gmir/kernel-store-u32} op)
         (when-not (= 512 (:gmir/maximum instruction))
+          (reject! :invalid-kernel-memory-maximum instruction)))
+      ;; 4096 and only 4096, because there is one spelling of each lock
+      ;; operation and it names a page. The value runtime's lock word lives at
+      ;; offset 0 of an RW/NX page, and its callers declare lengths of 512 and
+      ;; 4096; a 512 ceiling would trap the 4096 ones on the length check
+      ;; before reaching the word they share. Pinned as a single value rather
+      ;; than a set so a second spelling has to be added deliberately.
+      (when (contains? #{:gmir/kernel-try-lock-u32 :gmir/kernel-unlock-u32} op)
+        (when-not (= 4096 (:gmir/maximum instruction))
           (reject! :invalid-kernel-memory-maximum instruction)))
       (when (contains? #{:gmir/label :gmir/branch-zero :gmir/jump} op)
         (let [id (if (= op :gmir/label)

@@ -280,7 +280,17 @@
                  :gmir/functions [{:gmir/name 'main :gmir/arity 0
                                    :gmir/instructions instructions}]}]
     (is (= program (gmir/validate! program)))
+    (is (= 1 (:publish-current-domain gmir/x86-privileged-action-arities)))
+    (is (= 0 (:value-runtime-capability-table
+              gmir/x86-privileged-action-arities)))
+    (is (= 0 (:value-provider-queue gmir/x86-privileged-action-arities)))
+    (is (= 0 (:value-runtime-arena gmir/x86-privileged-action-arities)))
+    (is (= 0 (:value-runtime-cas-scratch gmir/x86-privileged-action-arities)))
+    (is (= 1 (:publish-value-provider-status
+              gmir/x86-privileged-action-arities)))
+    (is (= 0 (:value-provider-status gmir/x86-privileged-action-arities)))
     (is (= 2 (:write-msr gmir/x86-privileged-action-arities)))
+    (is (= 5 (:compare-exchange-u32 gmir/x86-privileged-action-arities)))
     (doseq [malformed [(assoc-in program [:gmir/functions 0 :gmir/instructions 2
                                           :gmir/action] :unknown)
                        (update-in program [:gmir/functions 0 :gmir/instructions 2

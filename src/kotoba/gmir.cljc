@@ -135,12 +135,19 @@
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at
   GMIR; MIR owns target admission and rejects them for every other target."
-  {:boot-info 0
+  {:boot-info 0 :publish-current-domain 1 :value-runtime-capability-table 0
+   :value-provider-queue 0 :value-runtime-arena 0 :value-runtime-cas-scratch 0
+   :publish-value-provider-status 1 :value-provider-status 0
    :read-cr2 0 :read-cr3 0 :write-cr3 1 :invlpg 1
    :cli 0 :sti 0 :hlt 0 :pause 0
    :out-u8 2 :out-u32 2 :in-u8 1 :in-u32 1
    :read-msr 1 :write-msr 2
-   :cpuid-eax 2 :cpuid-ebx 2 :cpuid-ecx 2 :cpuid-edx 2})
+   :cpuid-eax 2 :cpuid-ebx 2 :cpuid-ecx 2 :cpuid-edx 2
+   ;; A checked memory operation rather than ambient lock state: arguments are
+   ;; base, declared length, byte index, expected u32, desired u32. The x86
+   ;; selector validates the region before emitting LOCK CMPXCHG and returns
+   ;; the observed u32 value.
+   :compare-exchange-u32 5})
 
 (def capability-kinds
   "Closed native capability boundary. Zero is the scalar callback profile;

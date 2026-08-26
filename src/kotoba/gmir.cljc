@@ -162,7 +162,8 @@
 (def capability-kinds
   "Closed native capability boundary. Zero is the scalar callback profile;
   positive values are the typed host ABI discriminator."
-  {:i64 0 :string 1 :option-i64 2 :result-i64 3 :clock-v1 4 :dataspace-v1 5})
+  {:i64 0 :string 1 :option-i64 2 :result-i64 3 :clock-v1 4 :dataspace-v1 5
+   :ui-commit-v1 6 :ui-event-v1 7})
 
 (defn- phi-incoming? [incoming]
   (and (map? incoming)

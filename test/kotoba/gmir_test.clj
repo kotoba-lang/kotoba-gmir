@@ -282,6 +282,7 @@
     (is (= program (gmir/validate! program)))
     (is (= 2 (:write-msr gmir/x86-privileged-action-arities)))
     (is (= {:read-cs 0 :page-fault-handler-address 0
+            :rt-timer-handler-address 0
             :page-fault-recovery-handler-address 0
             :configure-page-fault-recovery 2 :load-idt 2
             :double-fault-handler-address 0
@@ -290,6 +291,7 @@
             :probe-recoverable-guard-write 0 :probe-double-fault 0}
            (select-keys gmir/x86-privileged-action-arities
                         [:read-cs :page-fault-handler-address
+                         :rt-timer-handler-address
                          :page-fault-recovery-handler-address
                          :configure-page-fault-recovery :load-idt
                          :double-fault-handler-address

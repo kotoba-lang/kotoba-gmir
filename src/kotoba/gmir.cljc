@@ -148,6 +148,7 @@
    :read-cr0 0 :write-cr0 1
    :read-cr2 0 :read-cr3 0 :write-cr3 1 :invlpg 1
    :read-cs 0 :page-fault-handler-address 0
+   :rt-timer-handler-address 0
    :page-fault-recovery-handler-address 0
    :configure-page-fault-recovery 2 :load-idt 2
    :double-fault-handler-address 0

@@ -139,7 +139,28 @@
    :vector-count 1
    :vector-at 2
    :vector-assoc 3
-   :vector-drop 2})
+   :vector-drop 2
+   ;; ABI v4 (superproject ADR-2609010200). Two operations the six above
+   ;; cannot express.
+   ;;
+   ;; `:vector-alloc` allocates n zeros. `vector-new` is variadic -- its arity
+   ;; IS the literal's element count -- so a struct of arrays with a million
+   ;; slots would need a million arguments in source, and the literal limit
+   ;; refuses that long before the item limit does.
+   ;;
+   ;; `:vector-assoc-in-place` is `:vector-assoc` lowered to a store: same
+   ;; arity, same meaning, and it returns the same handle rather than a new
+   ;; one. It is a SEPARATE runtime operation and not a flag on the first,
+   ;; because the two call different host slots and a flag would have to be
+   ;; carried through every layer between here and the encoder.
+   ;;
+   ;; Naming: KIR spells the source-level head `vector-assoc!`. The runtime
+   ;; operation is spelled out because this table is the host contract, where
+   ;; the distinction that matters is store-versus-copy rather than the claim
+   ;; the bang makes. Neither family gains an f64 twin: KIR declares no
+   ;; `vector-f64-alloc` and no `vector-f64-assoc!`.
+   :vector-alloc 1
+   :vector-assoc-in-place 3})
 
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at

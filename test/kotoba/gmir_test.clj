@@ -258,6 +258,15 @@
                   {:gmir/op :gmir/return :gmir/value v1}]}]
     (is (= program (gmir/validate! program)))
     (is (= 3 (:kgraph-assert! gmir/runtime-operation-arities)))
+    ;; ABI v4 (superproject ADR-2609010200). Pinned by name and arity, not
+    ;; only by count, because the pair is easy to get half-right: an allocation
+    ;; that took a vector, or an in-place write that took two arguments, would
+    ;; still leave this table the same size.
+    (is (= 1 (:vector-alloc gmir/runtime-operation-arities)))
+    (is (= 3 (:vector-assoc-in-place gmir/runtime-operation-arities)))
+    (is (= (:vector-assoc gmir/runtime-operation-arities)
+           (:vector-assoc-in-place gmir/runtime-operation-arities))
+        "the store and the copy are the same operation, so their arities agree")
     (testing "unknown runtime operations fail closed"
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate!

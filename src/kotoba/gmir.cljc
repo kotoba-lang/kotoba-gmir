@@ -46,6 +46,15 @@
    ;; `CHAR16 *` or an `EFI_GUID *`.
    :gmir/rodata-address #{:gmir/op :gmir/dst :gmir/content
                           :gmir/rodata-encoding}
+   ;; boot-scratch: the address of a FUNCTION in this same module, which is
+   ;; what `:jump-to` has always needed and nothing produced. Its own
+   ;; instruction rather than a privileged action, for the reason
+   ;; `:rodata-address` is: the operand is a NAME, not a virtual register, and
+   ;; every privileged action's arguments are vregs by the time a backend sees
+   ;; them. `:gmir/function` is a `function-id?` symbol, the same shape
+   ;; `:gmir/callee` carries, and a v3 module resolves it against its own
+   ;; function list exactly as it resolves a callee.
+   :gmir/function-address #{:gmir/op :gmir/dst :gmir/function}
    :gmir/add #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/subtract #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/multiply #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -536,6 +545,31 @@
    :uefi-call4 6
    :uefi-call6 8
    ;; boot-lit: end
+   ;; boot-scratch: `() -> the base of the writable scratch area the image
+   ;; packager reserves inside the image's own `.data`, immediately past the
+   ;; hidden context.
+   ;;
+   ;; It exists because every remaining UEFI boot service takes an OUT-POINTER
+   ;; and a Kotoba UEFI application had no address it was allowed to write.
+   ;; `.text` -- where the literal pool of ADR-0011 lives -- is `0x60000020`,
+   ;; read and execute; `:boot-info` and `:system-table` answer with words the
+   ;; firmware handed over, not with the address of the context they were
+   ;; parked in. So `AllocatePages`, `HandleProtocol` and `GetMemoryMap` were
+   ;; all unreachable, and `OpenProtocol` was reachable only because
+   ;; `EFI_OPEN_PROTOCOL_TEST_PROTOCOL` makes the firmware ignore its
+   ;; `Interface` out-parameter.
+   ;;
+   ;; Zero-arity and an ADDRESS, like `:page-fault-handler-address` -- not a
+   ;; load, so nothing is read out of the context and no slot has to be
+   ;; published. The backend's answer is one `lea` off the context register.
+   ;;
+   ;; The LENGTH is not a second action here. It is a compile-time constant
+   ;; that the source writes as the window length of the checked
+   ;; `kernel-load-*`/`kernel-store-*` it declares over the region, and
+   ;; kotoba-sema refuses a window wider than the reservation. A second action
+   ;; returning the same number would be a second spelling of one constant.
+   :scratch-region 0
+   ;; boot-scratch: end
    ;; isr: `(vector) -> the address of the toolchain-generated interrupt entry
    ;; for that vector`, which is what an IDT gate descriptor needs in its three
    ;; offset fields.
@@ -832,6 +866,19 @@
         (when-not (rodata-content? (:gmir/rodata-encoding instruction)
                                    (:gmir/content instruction))
           (reject! :invalid-rodata-content instruction)))
+      ;; boot-scratch: the shape of the name is checked here; WHICH names
+      ;; exist is checked by the module, which is the only thing that knows.
+      ;; A flat v1/v2 program has no function list to resolve against, so the
+      ;; instruction has no answer there and is refused rather than left to
+      ;; the backend, whose `encode-mc` passes an EMPTY callee-label table and
+      ;; would report `unknown-call-target` about a call the program does not
+      ;; contain.
+      (when (= op :gmir/function-address)
+        (when-not (and (vreg? (:gmir/dst instruction))
+                       (function-id? (:gmir/function instruction)))
+          (reject! :invalid-function-address instruction))
+        (when-not (= 3 program-version)
+          (reject! :function-address-needs-a-module instruction)))
       (when (and (= op :gmir/argument)
                  (not (and (integer? (:gmir/index instruction))
                            (not (neg? (:gmir/index instruction))))))
@@ -922,6 +969,19 @@
                           (count (distinct argument-indices))))
           (reject! :invalid-function-arguments
                    {:function name :arity arity :indices argument-indices})))
+      ;; boot-scratch: a named function's address resolves against this
+      ;; module's own function list, exactly as a callee does. `:gmir/call`
+      ;; below reports `:unresolved-callee`; this reports its own keyword
+      ;; because the two are different mistakes -- one calls something that is
+      ;; not there, the other takes the address of something that is not
+      ;; there, and only the second can still be a name the author spelled
+      ;; wrong in a program that has no call to it at all.
+      (doseq [{:gmir/keys [function] :as instruction}
+              (filter #(= :gmir/function-address (:gmir/op %)) instructions)]
+        (when-not (contains? signatures function)
+          (reject! :unresolved-function-address
+                   {:function name :instruction instruction
+                    :declared (vec (sort names))})))
       (doseq [{:gmir/keys [callee arguments] :as call}
               (filter #(contains? #{:gmir/call :gmir/tail-call}
                                    (:gmir/op %)) instructions)]

@@ -419,6 +419,34 @@
    ;; table describes one action at a time. kotoba-native
    ;; docs/avx2-guard-sequence.md carries it.
    :xgetbv 1
+   ;; xsave: the three actions that let a kernel ANSWER the question `:xgetbv`
+   ;; asks. The paragraph above says a guard must test CR4.OSXSAVE before
+   ;; reading XCR0; it does not say who SETS CR4.OSXSAVE, and until these three
+   ;; existed the answer was "a C function", because this table named CR0 and
+   ;; CR3 and stopped.
+   ;;
+   ;; `:read-cr4` and `:write-cr4` are the twins of `:read-cr0`/`:write-cr0`,
+   ;; at the same arities and for the same reason: a control register is one
+   ;; machine word, read whole and written whole. CR4 is where the extended
+   ;; state bits live -- OSFXSR (9), OSXMMEXCPT (10) and OSXSAVE (18) -- and
+   ;; the third of those is precisely the bit `xgetbv` faults without.
+   ;;
+   ;; `:xsetbv` is `:write-msr` with a different opcode: `(index, value)`,
+   ;; index in ECX and value split across EDX:EAX, exactly as `wrmsr` takes
+   ;; them. Arity 2 rather than 1, because XCR0 is not the only XCR the
+   ;; architecture reserves room for and an index that came from whatever was
+   ;; left in ECX would write a register nobody named.
+   ;;
+   ;; WHAT THIS TABLE CANNOT STATE, for the same reason it cannot state
+   ;; `xgetbv`'s ordering: `xsetbv` raises #GP when the value sets a bit XCR0
+   ;; does not define, when bit 0 (x87) is clear, and when the YMM bit is set
+   ;; without the SSE bit. Those are properties of a VALUE and of a SEQUENCE --
+   ;; CR4.OSXSAVE must already be set when `xsetbv` executes -- and this table
+   ;; describes one action at a time. kotoba-native docs/avx2-guard-sequence.md
+   ;; carries the sequence.
+   :read-cr4 0 :write-cr4 1
+   :xsetbv 2
+   ;; xsave: end
    ;; sysops: barriers, the timestamp counter and the GS-base swap.
    ;;
    ;; The three barriers are the ordering half of a device driver. A ring

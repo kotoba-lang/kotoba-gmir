@@ -7,6 +7,8 @@
 (def v2 (gmir/vreg 2))
 (def v3 (gmir/vreg 3))
 (def v4 (gmir/vreg 4))
+;; boot: a sixth vreg, for the arity-overflow cases below.
+(def v5 (gmir/vreg 5))
 
 (def program
   {:gmir/version 1
@@ -500,3 +502,33 @@
                    (gmir/validate!
                     (assoc-in (atomic-program op)
                               [:gmir/instructions 0 :gmir/expected] v3)))))))
+
+;; ---------------------------------------------------------------------------
+;; boot: the UEFI firmware boundary.
+;; ---------------------------------------------------------------------------
+
+(deftest boot-uefi-actions-are-closed-and-own-their-arity
+  (is (= {:system-table 0 :load-ptr 2 :uefi-call2 4 :jump-to 2}
+         (select-keys gmir/x86-privileged-action-arities
+                      [:system-table :load-ptr :uefi-call2 :jump-to])))
+  (doseq [[action arity] [[:system-table 0] [:load-ptr 2] [:uefi-call2 4]
+                          [:jump-to 2]]]
+    (let [arguments (subvec [v0 v1 v2 v3] 0 arity)
+          program {:gmir/version 1
+                   :gmir/instructions
+                   (vec (concat
+                         (map (fn [register value]
+                                {:gmir/op :gmir/constant :gmir/dst register
+                                 :gmir/value value})
+                              arguments (range 1 (inc arity)))
+                         [{:gmir/op :gmir/x86-privileged :gmir/dst v4
+                           :gmir/action action :gmir/arguments arguments}
+                          {:gmir/op :gmir/return :gmir/value v4}]))}]
+      (testing (str action " is admitted at its declared arity")
+        (is (= program (gmir/validate! program))))
+      (testing (str action " refuses one argument too many")
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (assoc-in program [:gmir/instructions arity :gmir/arguments]
+                                (conj arguments v5)))))))))
+

@@ -334,6 +334,40 @@
    :rdtsc 0 :rdtscp 0
    :swapgs 0
    ;; sysops: end
+   ;; boot: the UEFI firmware boundary. A BOOTX64.EFI written in Kotoba has to
+   ;; reach three things this family could not name.
+   ;;
+   ;; `:system-table` is the second argument UEFI passes to an EFI image entry
+   ;; point, read from the context slot the entry shim parks it in -- the twin
+   ;; of `:boot-info`, which reads the slot beside it. 0-arity, and a pure
+   ;; read of compiler-owned memory.
+   ;;
+   ;; `:load-ptr` is `(base, byte-offset) -> the 64-bit word there`. The
+   ;; firmware owns EFI_SYSTEM_TABLE and every protocol structure hanging off
+   ;; it, so a guest cannot declare a window over them the way the checked
+   ;; `kernel-load-*` family requires: the length is the firmware's, not the
+   ;; guest's, and asserting one would be inventing it. This reads the
+   ;; boundary the way `:in-u8` reads a device -- unchecked, privileged, never
+   ;; oracled -- and callers past that boundary use the checked family.
+   ;;
+   ;; `:uefi-call2` is `(base, slot-offset, a, b) -> status`: call the
+   ;; Microsoft x64 function pointer at `[base+slot-offset]` with `a` and `b`
+   ;; in RCX and RDX. FOUR operands rather than a variadic argument list,
+   ;; because `kotoba.mir`'s conservative expansion hands privileged actions
+   ;; the scratch tier and that tier is four registers wide on x86-64. Two
+   ;; UEFI arguments is what a bootloader's first calls need (ConOut methods,
+   ;; ExitBootServices); GetMemoryMap's five and OpenProtocol's six need an
+   ;; argument channel that does not fit in registers at all, and that is a
+   ;; separate decision.
+   ;;
+   ;; `:jump-to` is `(address, boot-info)` and does not return: it enters a
+   ;; kernel with the SysV first argument set, which is the handoff
+   ;; `package-embedded-kernel` hand-assembles today.
+   :system-table 0
+   :load-ptr 2
+   :uefi-call2 4
+   :jump-to 2
+   ;; boot: end
    })
 
 (def capability-kinds

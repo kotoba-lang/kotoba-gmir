@@ -793,7 +793,23 @@
   (is (= {:block-bytes 144 :block-elements 256}
          (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-q4-k)))
   (is (= {:block-bytes 210 :block-elements 256}
-         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-q6-k))))
+         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-q6-k)))
+  ;; dequant-iq: the four codebook formats, from the same typedefs.
+  (is (= {:block-bytes 136 :block-elements 256}
+         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-iq4-xs)))
+  (is (= {:block-bytes 82 :block-elements 256}
+         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-iq2-s)))
+  (is (= {:block-bytes 98 :block-elements 256}
+         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-iq3-xxs)))
+  (is (= {:block-bytes 110 :block-elements 256}
+         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-iq3-s)))
+  (testing "and every one of the seven is a distinct byte stride"
+    ;; A copied row is the failure this guards: two formats with the same
+    ;; stride would derive the same span from the same count and one of them
+    ;; would read the wrong bytes without tripping any length check.
+    (is (= 7 (count gmir/kernel-dequant-dot-formats)))
+    (is (= 7 (count (distinct (map :block-bytes
+                                   (vals gmir/kernel-dequant-dot-formats))))))))
 
 (deftest fused-dequant-dot-block-limit-is-derived-from-both-strides
   ;; The limit is the SMALLER of what each region can hold, and it is what
@@ -804,11 +820,16 @@
     (is (= (min (quot 65536 block-bytes) (quot 65536 (* 4 block-elements)))
            (gmir/kernel-dequant-dot-block-limit op))
         (str op " limit is derived")))
-  ;; Measured: every one of the three is bounded by its f32 side, which is
-  ;; how all three admit exactly 16384 elements.
+  ;; Measured: every one of the seven is bounded by its f32 side, which is
+  ;; how all seven admit exactly 16384 elements -- and the Qwen FFN dimension
+  ;; is 17408, so splitting a row into two calls remains a DIFFERENT
+  ;; accumulation tree rather than a size workaround.
   (is (= 512 (gmir/kernel-dequant-dot-block-limit :gmir/kernel-dequant-dot-q8-0)))
   (is (= 64 (gmir/kernel-dequant-dot-block-limit :gmir/kernel-dequant-dot-q4-k)))
   (is (= 64 (gmir/kernel-dequant-dot-block-limit :gmir/kernel-dequant-dot-q6-k)))
+  (doseq [op [:gmir/kernel-dequant-dot-iq4-xs :gmir/kernel-dequant-dot-iq2-s
+              :gmir/kernel-dequant-dot-iq3-xxs :gmir/kernel-dequant-dot-iq3-s]]
+    (is (= 64 (gmir/kernel-dequant-dot-block-limit op)) (str op)))
   (doseq [[op {:keys [block-elements]}] gmir/kernel-dequant-dot-formats]
     (is (= gmir/kernel-dot-f32-element-limit
            (* block-elements (gmir/kernel-dequant-dot-block-limit op)))

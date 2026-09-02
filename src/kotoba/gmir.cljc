@@ -254,6 +254,21 @@
    :gmir/kernel-dequant-dot-q6-k #{:gmir/op :gmir/dst :gmir/base :gmir/length
                                    :gmir/second-base :gmir/second-length
                                    :gmir/count :gmir/maximum}
+   ;; dequant-iq: the codebook family. Same keyset, same operand shape --
+   ;; what differs is that a code is an INDEX INTO A TABLE rather than a
+   ;; number, and the table belongs to the format rather than to the block.
+   :gmir/kernel-dequant-dot-iq4-xs #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                   :gmir/second-base :gmir/second-length
+                                   :gmir/count :gmir/maximum}
+   :gmir/kernel-dequant-dot-iq2-s #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                  :gmir/second-base :gmir/second-length
+                                  :gmir/count :gmir/maximum}
+   :gmir/kernel-dequant-dot-iq3-xxs #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                    :gmir/second-base :gmir/second-length
+                                    :gmir/count :gmir/maximum}
+   :gmir/kernel-dequant-dot-iq3-s #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                  :gmir/second-base :gmir/second-length
+                                  :gmir/count :gmir/maximum}
    ;; dequant: end
    :gmir/kernel-subregion #{:gmir/op :gmir/dst :gmir/base :gmir/length
                             :gmir/offset :gmir/size}
@@ -345,7 +360,13 @@
 (def kernel-dequant-dot-formats
   {:gmir/kernel-dequant-dot-q8-0 {:block-bytes 34  :block-elements 32}
    :gmir/kernel-dequant-dot-q4-k {:block-bytes 144 :block-elements 256}
-   :gmir/kernel-dequant-dot-q6-k {:block-bytes 210 :block-elements 256}})
+   :gmir/kernel-dequant-dot-q6-k {:block-bytes 210 :block-elements 256}
+   ;; dequant-iq: the four codebook formats. 306 of the Qwen3.5 model's 866
+   ;; tensors carry one of these, which is more than any other family.
+   :gmir/kernel-dequant-dot-iq4-xs {:block-bytes 136 :block-elements 256}
+   :gmir/kernel-dequant-dot-iq2-s {:block-bytes 82 :block-elements 256}
+   :gmir/kernel-dequant-dot-iq3-xxs {:block-bytes 98 :block-elements 256}
+   :gmir/kernel-dequant-dot-iq3-s {:block-bytes 110 :block-elements 256}})
 
 (def kernel-dequant-dot-operations (set (keys kernel-dequant-dot-formats)))
 

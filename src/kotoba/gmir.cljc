@@ -650,6 +650,41 @@
    ;; returning the same number would be a second spelling of one constant.
    :scratch-region 0
    ;; boot-scratch: end
+   ;; fwstore: `(base, slot, allocate-type, memory-type, page-count,
+   ;; address-hint) -> the base of the pages the firmware just allocated, or
+   ;; ZERO`. Six operands, and the only action in this table that both CALLS
+   ;; the firmware and answers with an address rather than with a status.
+   ;;
+   ;; `:scratch-region` above gave a UEFI application an out-pointer, which is
+   ;; what `AllocatePages` needs to answer at all. It did not give it a way to
+   ;; USE the answer: the page is at an address the firmware chose, so it
+   ;; reaches the program through a load, and kotoba-sema's region-provenance
+   ;; rule refuses a base that came from one. A UEFI application could
+   ;; allocate a page and could not write it.
+   ;;
+   ;; The fix is not to admit loaded words as bases -- that deletes the rule
+   ;; rather than extending it. It is to make the ALLOCATION itself the
+   ;; producer of the address, so that the pairing of a base with a length is
+   ;; established by the same instruction that obtained the base. The out-word
+   ;; the firmware writes through lives in this action's own outgoing frame:
+   ;; the program never names it, so there is no second writer of it and no
+   ;; way to hand this action an address it did not get from `AllocatePages`.
+   ;;
+   ;; `address-hint` is the word the out-pointer is PRE-LOADED with. For
+   ;; `AllocateAnyPages` (0) the firmware ignores it; for `AllocateMaxAddress`
+   ;; (1) it is the ceiling; for `AllocateAddress` (2) it is the requested
+   ;; base. All three allocate exactly `page-count` 4 KiB pages, which is why
+   ;; the length of the answer is known at the call site under every one of
+   ;; them.
+   ;;
+   ;; ZERO on failure, rather than a status beside the address. Kotoba has no
+   ;; multi-value return on a firmware target, and a null base is the one
+   ;; answer every bounded memory operation already refuses -- so a caller that
+   ;; forgets to test it traps at the first access instead of writing at
+   ;; whatever the out-word happened to hold. The EFI_STATUS itself is not
+   ;; reported; see the ADR, which records that as the price.
+   :uefi-alloc-region 6
+   ;; fwstore: end
    ;; isr: `(vector) -> the address of the toolchain-generated interrupt entry
    ;; for that vector`, which is what an IDT gate descriptor needs in its three
    ;; offset fields.

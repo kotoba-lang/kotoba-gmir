@@ -183,6 +183,34 @@
                               :gmir/index :gmir/expected :gmir/stored
                               :gmir/maximum}
    ;; sysops: end
+   ;; simd: one dot product of two f32 regions, as ONE operation.
+   ;;
+   ;; It is not a load family member and not a composition of them. Every
+   ;; other memory operation here moves one element and lets the guest write
+   ;; the loop; this one owns the loop, because what it exists to select is a
+   ;; vector instruction sequence -- eight lanes at a time on a machine that
+   ;; has AVX2, and a scalar sequence with the SAME accumulation tree on a
+   ;; machine that does not. A guest-written loop over `slice-load-u32` can
+   ;; express the arithmetic and cannot express that choice: the backend
+   ;; would have to recognise the loop to vectorise it, and a backend that
+   ;; recognises loops is a different program from this one.
+   ;;
+   ;; TWO regions, so TWO bases and TWO lengths. `:gmir/base`/`:gmir/length`
+   ;; stay the names of the FIRST region rather than becoming
+   ;; `:gmir/first-base`, so that anything downstream reading `:gmir/base`
+   ;; still finds a base; the second pair is named for its position.
+   ;; `:gmir/count` counts ELEMENTS, and the lengths count BYTES -- the same
+   ;; split the slice family made, kept here because the lengths describe
+   ;; regions the caller declared in bytes and the count describes how many
+   ;; four-byte elements of them to read.
+   ;;
+   ;; `:gmir/maximum` is the byte ceiling on BOTH lengths, pinned to one
+   ;; value the way the lock pair's 4096 is, so a second spelling has to be
+   ;; added deliberately.
+   :gmir/kernel-dot-f32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                          :gmir/second-base :gmir/second-length
+                          :gmir/count :gmir/maximum}
+   ;; simd: end
    :gmir/kernel-subregion #{:gmir/op :gmir/dst :gmir/base :gmir/length
                             :gmir/offset :gmir/size}
    :gmir/equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -239,6 +267,29 @@
   decision is that the carrier does not travel through the vector arena, and
   therefore that arena's item bound is not its ceiling."
   1099511627776)
+
+;; simd: the f32 dot product's byte ceiling on each of its two regions.
+;;
+;; 65536 and only 65536, and pinned as a single value rather than drawn from
+;; `kernel-window-maxima`, for the reason the lock pair's 4096 is pinned: one
+;; spelling of the operation names one ceiling, and a second has to be added
+;; deliberately. It is the largest tier the window family already declares, so
+;; it costs the same `cmp r64, imm32` every other ceiling does.
+;;
+;; It is NOT the slice family's address-space bound. A region this operation
+;; reads travels through the same declared-window discipline every
+;; `kernel-load-*` uses; the carrier that is bounded by the address space
+;; instead is `slice-*`, and giving this operation that bound would be
+;; deciding ADR 0285's question here rather than there.
+(def kernel-dot-f32-maximum 65536)
+
+(def kernel-dot-f32-element-limit
+  "How many four-byte elements the ceiling above admits. DERIVED, so the two
+  cannot drift: a count above this makes `count * 4` exceed any admissible
+  length, and bounding the count is also what keeps that product from wrapping
+  a 64-bit multiply before it is compared."
+  (quot kernel-dot-f32-maximum 4))
+;; simd: end
 
 ;; sysops: the general atomic read-modify-write family, named once so the
 ;; keyset table, the operand check and the ceiling check cannot drift apart --
@@ -508,6 +559,11 @@
                                            ;; comparand is an operand like any
                                            ;; other and must be a vreg.
                                            :gmir/expected
+                                           ;; simd: the second region's pair
+                                           ;; and the element count are
+                                           ;; operands like any other.
+                                           :gmir/second-base :gmir/second-length
+                                           :gmir/count
                                            :gmir/offset :gmir/size])]
         (when-not (vreg? register)
           (reject! :invalid-virtual-register instruction)))
@@ -598,6 +654,12 @@
         (when-not (= 4096 (:gmir/maximum instruction))
           (reject! :invalid-kernel-memory-maximum instruction)))
       ;; sysops: end
+      ;; simd: one spelling, one ceiling, pinned as a single value for the
+      ;; reason the lock pair's is.
+      (when (= :gmir/kernel-dot-f32 op)
+        (when-not (= kernel-dot-f32-maximum (:gmir/maximum instruction))
+          (reject! :invalid-kernel-memory-maximum instruction)))
+      ;; simd: end
       (when (contains? #{:gmir/label :gmir/branch-zero :gmir/jump} op)
         (let [id (if (= op :gmir/label)
                    (:gmir/id instruction)

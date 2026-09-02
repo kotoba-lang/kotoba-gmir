@@ -68,6 +68,48 @@
                            :gmir/index :gmir/maximum}
    :gmir/kernel-store-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
                             :gmir/index :gmir/stored :gmir/maximum}
+   ;; memwidth: the two remaining MMIO transfer widths. A device register file
+   ;; is not all bytes and words -- 16-bit is what a PCI vendor/device ID pair
+   ;; and most legacy device registers are, and 64-bit is what a descriptor
+   ;; ring pointer is. They carry EXACTLY the fields their u8/u32 siblings do,
+   ;; because the only thing that differs is how many bytes the access moves;
+   ;; the width lives in the operation name, the way it already does for the
+   ;; two that were here first.
+   :gmir/kernel-load-u16 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/maximum}
+   :gmir/kernel-store-u16 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                            :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/kernel-load-u64 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/maximum}
+   :gmir/kernel-store-u64 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                            :gmir/index :gmir/stored :gmir/maximum}
+   ;; memwidth: the slice family (amu ADR 0285). Same four sources, and
+   ;; deliberately the same keyset, so nothing downstream has to learn a new
+   ;; instruction SHAPE. Two things differ and neither is a field:
+   ;;
+   ;;   * `:gmir/index` counts ELEMENTS, not bytes, and the backend scales it
+   ;;     into the addressing mode. `:gmir/length` counts elements too.
+   ;;   * `:gmir/maximum` is `slice-item-limit`, which is an address-space
+   ;;     bound rather than a window profile. ADR 0285's whole point is that
+   ;;     the carrier does not go through the vector arena and therefore is
+   ;;     not bounded by `vector-item-limit`; a 10 GiB model region is a
+   ;;     legitimate slice and 16384 is not its ceiling.
+   :gmir/slice-load-u8 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                         :gmir/index :gmir/maximum}
+   :gmir/slice-store-u8 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                          :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/slice-load-u16 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                          :gmir/index :gmir/maximum}
+   :gmir/slice-store-u16 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/slice-load-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                          :gmir/index :gmir/maximum}
+   :gmir/slice-store-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/slice-load-u64 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                          :gmir/index :gmir/maximum}
+   :gmir/slice-store-u64 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/stored :gmir/maximum}
    ;; The lock pair carries exactly the load's fields: it reads and writes one
    ;; u32 at `index`, and the value it produces is whether this caller won.
    ;; `:gmir/stored` is deliberately absent -- what gets stored is fixed by the
@@ -124,6 +166,44 @@
                            :gmir/kind :gmir/arguments}
    :gmir/return #{:gmir/op :gmir/value}})
 
+
+;; memwidth: the checked-memory families, as data rather than as a set
+;; repeated at each of the four places that used to name them.
+;;
+;; `kernel-window-operations` are BYTE-indexed accesses into a window whose
+;; declared length the operation's `:gmir/maximum` caps. `slice-operations`
+;; are ELEMENT-indexed accesses into a host-supplied region whose ceiling is
+;; the address space (amu ADR 0285); their `:gmir/index` is scaled by the
+;; access width in the addressing mode rather than added as a byte offset.
+
+(def kernel-window-operations
+  #{:gmir/kernel-load-u8 :gmir/kernel-store-u8
+    :gmir/kernel-load-u16 :gmir/kernel-store-u16
+    :gmir/kernel-load-u32 :gmir/kernel-store-u32
+    :gmir/kernel-load-u64 :gmir/kernel-store-u64})
+
+(def kernel-window-maxima
+  "Declared window ceilings. 65536 costs the same `cmp r64, imm32` that 512
+  does, so the tier exists because the encoding is identical, not because a
+  caller asked for it."
+  #{512 4096 16384 65536})
+
+(def slice-operations
+  #{:gmir/slice-load-u8 :gmir/slice-store-u8
+    :gmir/slice-load-u16 :gmir/slice-store-u16
+    :gmir/slice-load-u32 :gmir/slice-store-u32
+    :gmir/slice-load-u64 :gmir/slice-store-u64})
+
+(def slice-item-limit
+  "2^40 elements. Chosen so that `length * 8` -- the widest element this family
+  carries -- stays under 2^43 and therefore cannot wrap a 64-bit address
+  computation, while still admitting regions three orders of magnitude beyond
+  the 10 GiB model image that motivated the carrier. It is an ADDRESS-SPACE
+  bound, deliberately not derived from `vector-item-limit` (16384): ADR 0285's
+  decision is that the carrier does not travel through the vector arena, and
+  therefore that arena's item bound is not its ceiling."
+  1099511627776)
+
 ;; sysops: the general atomic read-modify-write family, named once so the
 ;; keyset table, the operand check and the ceiling check cannot drift apart --
 ;; and so `kotoba.mir` and `kotoba.native.machine-ir` can derive their own
@@ -133,6 +213,14 @@
     :gmir/kernel-xchg-u32 :gmir/kernel-xchg-u64
     :gmir/kernel-cmpxchg-u32 :gmir/kernel-cmpxchg-u64})
 ;; sysops: end
+
+;; memwidth: every operation that carries a `:gmir/index` operand -- the two
+;; windowed families, the slice family, the lock pair and (merged from the
+;; sysops branch) the general atomics. Named once so the operand check cannot
+;; drift from the keyset table.
+(def ^:private indexed-memory-operations
+  (into #{:gmir/kernel-try-lock-u32 :gmir/kernel-unlock-u32}
+        (concat kernel-window-operations slice-operations kernel-atomic-ops)))
 
 (def ^:private v1-operations
   (disj (set (keys instruction-keysets)) :gmir/phi :gmir/tail-call))
@@ -336,13 +424,7 @@
                                            :gmir/offset :gmir/size])]
         (when-not (vreg? register)
           (reject! :invalid-virtual-register instruction)))
-      (when (and (contains? (into #{:gmir/kernel-load-u8 :gmir/kernel-store-u8
-                                    :gmir/kernel-load-u32 :gmir/kernel-store-u32
-                                    :gmir/kernel-try-lock-u32 :gmir/kernel-unlock-u32}
-                                  ;; sysops: the general atomics index the same
-                                  ;; way the loads and stores do.
-                                  kernel-atomic-ops)
-                            op)
+      (when (and (contains? indexed-memory-operations op)
                  (not (vreg? (:gmir/index instruction))))
         (reject! :invalid-virtual-register instruction))
       (when (and (= op :gmir/return) (not (vreg? (:gmir/value instruction))))
@@ -398,14 +480,19 @@
                  (not (and (integer? (:gmir/index instruction))
                            (not (neg? (:gmir/index instruction))))))
         (reject! :argument-index-invalid instruction))
-      (when (contains? #{:gmir/kernel-load-u8 :gmir/kernel-store-u8} op)
-        (when-not (contains? #{512 4096 16384} (:gmir/maximum instruction))
-          (reject! :invalid-kernel-memory-maximum instruction))
-        (when (and (= op :gmir/kernel-store-u8)
-                   (= 16384 (:gmir/maximum instruction)))
+      ;; memwidth: one table for every windowed access instead of one clause
+      ;; per width. The clause per width is how `kernel-store-u8` came to be
+      ;; the only operation in the family that could not name a 16 KiB window
+      ;; -- not by decision, but because its own `when` said so and nothing
+      ;; else did.
+      (when (contains? kernel-window-operations op)
+        (when-not (contains? kernel-window-maxima (:gmir/maximum instruction))
           (reject! :invalid-kernel-memory-maximum instruction)))
-      (when (contains? #{:gmir/kernel-load-u32 :gmir/kernel-store-u32} op)
-        (when-not (= 512 (:gmir/maximum instruction))
+      ;; memwidth: a slice's ceiling is the address space, not a window
+      ;; profile. It is pinned to one value for the same reason the lock
+      ;; pair's 4096 is: a second spelling has to be added deliberately.
+      (when (contains? slice-operations op)
+        (when-not (= slice-item-limit (:gmir/maximum instruction))
           (reject! :invalid-kernel-memory-maximum instruction)))
       ;; 4096 and only 4096, because there is one spelling of each lock
       ;; operation and it names a page. The value runtime's lock word lives at

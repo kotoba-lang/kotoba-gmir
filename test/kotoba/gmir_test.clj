@@ -97,6 +97,72 @@
                      :gmir/maximum 513}
                     {:gmir/op :gmir/return :gmir/value v3}]})))))
 
+(deftest memwidth-families-are-admitted-and-bounded
+  (let [constants (mapv (fn [register value]
+                          {:gmir/op :gmir/constant :gmir/dst register
+                           :gmir/value value})
+                        [v0 v1 v2 v3] [4096 512 3 42])
+        wrap (fn [instruction]
+               {:gmir/version 1
+                :gmir/instructions
+                (conj constants instruction
+                      {:gmir/op :gmir/return :gmir/value v4})})]
+    (testing "u16 and u64 windows carry the u8/u32 shape at every tier"
+      (doseq [op [:gmir/kernel-load-u16 :gmir/kernel-load-u64]
+              maximum gmir/kernel-window-maxima]
+        (let [candidate (wrap {:gmir/op op :gmir/dst v4 :gmir/base v0
+                               :gmir/length v1 :gmir/index v2
+                               :gmir/maximum maximum})]
+          (is (= candidate (gmir/validate! candidate)) (str op " " maximum))))
+      (doseq [op [:gmir/kernel-store-u16 :gmir/kernel-store-u64]
+              maximum gmir/kernel-window-maxima]
+        (let [candidate (wrap {:gmir/op op :gmir/dst v4 :gmir/base v0
+                               :gmir/length v1 :gmir/index v2 :gmir/stored v3
+                               :gmir/maximum maximum})]
+          (is (= candidate (gmir/validate! candidate)) (str op " " maximum)))))
+    (testing "store-u8 reaches 16384 and every width reaches 65536"
+      (doseq [maximum [16384 65536]]
+        (let [candidate (wrap {:gmir/op :gmir/kernel-store-u8 :gmir/dst v4
+                               :gmir/base v0 :gmir/length v1 :gmir/index v2
+                               :gmir/stored v3 :gmir/maximum maximum})]
+          (is (= candidate (gmir/validate! candidate)) (str maximum))))
+      (doseq [maximum [4096 16384 65536]]
+        (let [candidate (wrap {:gmir/op :gmir/kernel-load-u32 :gmir/dst v4
+                               :gmir/base v0 :gmir/length v1 :gmir/index v2
+                               :gmir/maximum maximum})]
+          (is (= candidate (gmir/validate! candidate)) (str maximum)))))
+    (testing "a window maximum outside the tier set is still refused"
+      (doseq [op gmir/kernel-window-operations]
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (wrap (cond-> {:gmir/op op :gmir/dst v4 :gmir/base v0
+                                     :gmir/length v1 :gmir/index v2
+                                     :gmir/maximum 65537}
+                              (re-find #"store" (name op))
+                              (assoc :gmir/stored v3)))))
+            (str op))))
+    (testing "the slice family admits its own ceiling and nothing else"
+      (doseq [op gmir/slice-operations]
+        (let [base {:gmir/op op :gmir/dst v4 :gmir/base v0 :gmir/length v1
+                    :gmir/index v2}
+              base (cond-> base (re-find #"store" (name op))
+                           (assoc :gmir/stored v3))
+              candidate (wrap (assoc base :gmir/maximum gmir/slice-item-limit))]
+          (is (= candidate (gmir/validate! candidate)) (str op))
+          ;; A window tier is not a slice ceiling, and vice versa: the two
+          ;; families do not share a bound even though they share a keyset.
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (gmir/validate! (wrap (assoc base :gmir/maximum 16384))))
+              (str op " must refuse a window tier"))))
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (gmir/validate!
+                    (wrap {:gmir/op :gmir/kernel-load-u8 :gmir/dst v4
+                           :gmir/base v0 :gmir/length v1 :gmir/index v2
+                           :gmir/maximum gmir/slice-item-limit})))
+          "a window operation must refuse the slice ceiling"))
+    (testing "the slice ceiling cannot wrap a 64-bit scaled address"
+      (is (< (* gmir/slice-item-limit 8) (bit-shift-left 1 62))))))
+
 (deftest contract-fails-closed
   (testing "unknown operations and extra fields"
     (is (thrown? clojure.lang.ExceptionInfo

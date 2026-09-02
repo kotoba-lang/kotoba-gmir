@@ -60,6 +60,42 @@
    :gmir/f64-greater-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/f64-greater-or-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/f64-unordered #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   ;; f32: binary32, the parallel family
+   ;; (kotoba-lang docs/adr/ADR-kotoba-floating-point-on-native.md).
+   ;;
+   ;; Same operand shapes as the f64 family above and the same one-word vreg --
+   ;; an f32 travels as its binary32 pattern SIGN-EXTENDED from bit 31, which is
+   ;; still one machine word and needs no new value kind here.
+   ;;
+   ;; TWO f64 members have no f32 twin, and their absence is the decision rather
+   ;; than an omission: x86's MINSS/MAXSS return the SECOND operand when either
+   ;; input is NaN, while AArch64's FMIN/FMAX and the KIR oracle's Math/min
+   ;; return the NaN. `:gmir/f64-min`/`:gmir/f64-max` above therefore already
+   ;; mean two different things on the two targets; that is recorded upstream
+   ;; and not repaired here, and this width does not inherit it.
+   :gmir/f32-add #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-subtract #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-multiply #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-divide #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-sqrt #{:gmir/op :gmir/dst :gmir/input}
+   :gmir/f32-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-less-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-less-or-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-greater-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-greater-or-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-unordered #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   ;; Width conversions. Only the four on which both ISAs and the KIR oracle
+   ;; agree for EVERY input: widening is exact and total, narrowing is
+   ;; round-to-nearest-even with overflow to an infinity, and every i64 has a
+   ;; defined image at both widths. The `-checked` conversions trap in the
+   ;; oracle and no backend emits that check; the truncating float-to-int ones
+   ;; have THREE answers out of domain (x86 yields the integer indefinite value,
+   ;; AArch64 saturates, the oracle traps). Neither family is declared here,
+   ;; because an operation that cannot mean one thing is not an operation.
+   :gmir/f32-to-f64 #{:gmir/op :gmir/dst :gmir/input}
+   :gmir/f64-to-f32 #{:gmir/op :gmir/dst :gmir/input}
+   :gmir/i64-to-f32 #{:gmir/op :gmir/dst :gmir/input}
+   :gmir/i64-to-f64 #{:gmir/op :gmir/dst :gmir/input}
    :gmir/kernel-load-u8 #{:gmir/op :gmir/dst :gmir/base :gmir/length
                           :gmir/index :gmir/maximum}
    :gmir/kernel-store-u8 #{:gmir/op :gmir/dst :gmir/base :gmir/length

@@ -342,6 +342,23 @@
    :out-u8 2 :out-u32 2 :in-u8 1 :in-u32 1
    :read-msr 1 :write-msr 2
    :cpuid-eax 2 :cpuid-ebx 2 :cpuid-ecx 2 :cpuid-edx 2
+   ;; simdprep: `xgetbv` reads XCR[ecx] into edx:eax, so one argument -- the
+   ;; XCR index -- and one i64 result carrying both halves.
+   ;;
+   ;; It is here because the `cpuid` four cannot express a CPU feature check
+   ;; on their own. Leaf 1 ECX bit 28 says the CPU implements AVX; XCR0 bits 1
+   ;; and 2 say the OPERATING SYSTEM has agreed to save and restore the SSE
+   ;; and YMM register state across a context switch. A kernel that reads only
+   ;; the first and uses YMM anyway does not fault: it computes wrong answers
+   ;; intermittently and only under load, because its vector registers are not
+   ;; preserved.
+   ;;
+   ;; The ordering this cannot state -- `xgetbv` raises #UD unless
+   ;; CR4.OSXSAVE is set, which is leaf 1 ECX bit 27, so 27 must be tested
+   ;; BEFORE XCR0 is read -- is a property of a SEQUENCE of actions, and this
+   ;; table describes one action at a time. kotoba-native
+   ;; docs/avx2-guard-sequence.md carries it.
+   :xgetbv 1
    ;; sysops: barriers, the timestamp counter and the GS-base swap.
    ;;
    ;; The three barriers are the ordering half of a device driver. A ring

@@ -567,3 +567,50 @@
                      (gmir/validate!
                       (assoc-in program [:gmir/instructions 1 :gmir/arguments]
                                 arguments))))))))
+
+;; ---------------------------------------------------------------------------
+;; isr: the interrupt entry address
+;; ---------------------------------------------------------------------------
+
+(deftest isr-entry-address-takes-the-vector-and-nothing-else
+  ;; An IDT gate descriptor carries the entry address split across three
+  ;; offset fields, so a kernel that installs its own IDT has to be able to
+  ;; NAME the entry. `:isr-entry-address` is that name, and its one operand is
+  ;; the vector number -- which is also the entry's name, because an entry is
+  ;; declared as `aiueos-isr-<vector>`.
+  ;;
+  ;; Arity 1 rather than 0: the family already has zero-arity address actions
+  ;; (`:page-fault-handler-address` and its two siblings), and each of those
+  ;; names exactly ONE canned handler. This one names any of a table, so the
+  ;; vector has to arrive as an operand.
+  (is (= 1 (:isr-entry-address gmir/x86-privileged-action-arities)))
+  ;; Pinned beside it: the three canned handler addresses stay zero-arity.
+  ;; They are not members of this table and adding an operand to them would be
+  ;; a different change with different bytes.
+  (is (= {:page-fault-handler-address 0
+          :page-fault-recovery-handler-address 0
+          :double-fault-handler-address 0}
+         (select-keys gmir/x86-privileged-action-arities
+                      [:page-fault-handler-address
+                       :page-fault-recovery-handler-address
+                       :double-fault-handler-address])))
+  (let [program {:gmir/version 1
+                 :gmir/instructions
+                 [{:gmir/op :gmir/constant :gmir/dst v0 :gmir/value 3}
+                  {:gmir/op :gmir/x86-privileged :gmir/dst v1
+                   :gmir/action :isr-entry-address :gmir/arguments [v0]}
+                  {:gmir/op :gmir/return :gmir/value v1}]}]
+    (is (= program (gmir/validate! program))
+        "one argument is admitted")
+    (doseq [[label arguments] [["no arguments" []]
+                               ["two arguments" [v0 v0]]]]
+      (testing (str :isr-entry-address " refuses " label)
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (assoc-in program [:gmir/instructions 1 :gmir/arguments]
+                                arguments))))))
+    (testing "the operand must be a virtual register, not a literal vector"
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (gmir/validate!
+                    (assoc-in program [:gmir/instructions 1 :gmir/arguments]
+                              [3])))))))

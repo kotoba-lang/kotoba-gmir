@@ -421,6 +421,26 @@
    :uefi-call2 4
    :jump-to 2
    ;; boot: end
+   ;; isr: `(vector) -> the address of the toolchain-generated interrupt entry
+   ;; for that vector`, which is what an IDT gate descriptor needs in its three
+   ;; offset fields.
+   ;;
+   ;; ONE argument, and it is the vector NUMBER rather than a name. An entry is
+   ;; named `aiueos-isr-<vector>` in the source, so the name and the vector
+   ;; carry the same information; taking the number is what lets this ride the
+   ;; ordinary privileged channel, whose operands are virtual registers by the
+   ;; time any backend sees them. A name would have to survive as a literal
+   ;; through GMIR, MIR and register allocation, and nothing in this IR carries
+   ;; a symbol operand.
+   ;;
+   ;; The answer is a LOAD from the image's kernel context, not an address the
+   ;; encoder knows: the entries are laid down by the ELF image packager, which
+   ;; runs after every byte of the function has been emitted. That is also why
+   ;; it has no answer at all in the relocatable-object route, where the
+   ;; context is the object's own private 80 bytes -- kotoba-native refuses
+   ;; there rather than reading past it.
+   :isr-entry-address 1
+   ;; isr: end
    })
 
 (def capability-kinds

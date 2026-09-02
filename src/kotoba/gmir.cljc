@@ -37,6 +37,15 @@
   {:gmir/argument #{:gmir/op :gmir/dst :gmir/index}
    :gmir/constant #{:gmir/op :gmir/dst :gmir/value}
    :gmir/data-address #{:gmir/op :gmir/dst :gmir/content}
+   ;; boot-lit: the address of a read-only literal the backend places in the
+   ;; code image itself. `:gmir/data-address` above is NOT this operation:
+   ;; that one names a UTF-8 string the value runtime pairs with a length and
+   ;; resolves against a runtime base, and it is the string-literal half of a
+   ;; managed value. This one is the address of raw bytes with no runtime
+   ;; behind it at all -- what a firmware call needs when it takes a
+   ;; `CHAR16 *` or an `EFI_GUID *`.
+   :gmir/rodata-address #{:gmir/op :gmir/dst :gmir/content
+                          :gmir/rodata-encoding}
    :gmir/add #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/subtract #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/multiply #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -472,6 +481,33 @@
    :uefi-call2 4
    :jump-to 2
    ;; boot: end
+   ;; boot-lit: the separate decision the paragraph above defers, taken.
+   ;;
+   ;; `:uefi-call4` is `(base, slot, a, b, c, d)` and `:uefi-call6` is
+   ;; `(base, slot, a, b, c, d, e, f)`. The register tier did NOT get wider:
+   ;; `kotoba.mir`'s conservative expansion now draws privileged argument
+   ;; registers from the scratch tier FOLLOWED BY the preserved tier, and the
+   ;; preserved tier is callee-saved under Microsoft x64 as well as under the
+   ;; internal SysV ABI, so an argument parked there survives the firmware
+   ;; call it is an argument to. That is the whole trick; nothing about the
+   ;; call itself needed a wider machine.
+   ;;
+   ;; TWO arities rather than one variadic action, and rather than one
+   ;; six-argument action used for everything, because the count is the only
+   ;; thing that distinguishes `AllocatePages(type, memtype, pages, &addr)`
+   ;; from `OpenProtocol(h, &guid, &iface, agent, controller, attributes)` at
+   ;; this layer, and a call site that passes four arguments to a six-argument
+   ;; action has to invent two. Microsoft x64 would let those two be garbage
+   ;; -- the callee reads only what it declares -- but "the extra words are
+   ;; ignored" is a property of the CALLEE, and this table describes the
+   ;; caller.
+   ;;
+   ;; `:uefi-call2` keeps its own narrower encoding. It is not a special case
+   ;; of these: its emitted frame is 0x50 where theirs is 0x60, and those
+   ;; bytes are the ones that booted (amu ADR-0291).
+   :uefi-call4 6
+   :uefi-call6 8
+   ;; boot-lit: end
    ;; isr: `(vector) -> the address of the toolchain-generated interrupt entry
    ;; for that vector`, which is what an IDT gate descriptor needs in its three
    ;; offset fields.
@@ -493,6 +529,125 @@
    :isr-entry-address 1
    ;; isr: end
    })
+
+;; boot-lit: read-only literals ────────────────────────────────────────────
+;;
+;; Three encodings, closed, because each one is a shape some firmware ABI
+;; already fixed and none of them is a generalisation of another.
+;;
+;; `:utf-16le-nul` is what UEFI calls a `CHAR16 *`: UCS-2 code units, little
+;; endian, terminated by a 16-bit zero. Surrogates are REFUSED rather than
+;; encoded, because a surrogate pair is UTF-16 and UEFI's `SIMPLE_TEXT_OUTPUT`
+;; is specified over UCS-2; writing the pair would produce two code units the
+;; firmware renders as two replacement glyphs, which is a wrong answer that
+;; looks like a working one.
+;;
+;; `:guid-mixed-endian` is `EFI_GUID`, whose first three fields are integers
+;; (4, 2 and 2 bytes, little-endian on the wire) and whose last two are byte
+;; arrays written in order. That mixture is why the canonical text form of a
+;; GUID cannot simply be hex-decoded: `5B1B31A1-...` starts `a1 31 1b 5b` in
+;; memory. Getting it backwards does not fault -- `HandleProtocol` just
+;; returns `EFI_UNSUPPORTED` for a protocol nobody installed.
+;;
+;; `:hex-bytes` is the escape hatch: exactly the bytes written, for a
+;; structure neither of the two above describes.
+;;
+;; The CONTENT stays the source text in every case and the bytes are derived,
+;; so dedup keys on what the program wrote and two spellings of the same GUID
+;; are two literals. That is deliberate: a canonicalising decoder here would
+;; be a second place that has to agree with the frontend's validator about
+;; what a GUID is.
+
+(def rodata-encodings
+  #{:utf-16le-nul :guid-mixed-endian :hex-bytes})
+
+(def rodata-alignment
+  "Every literal starts on an 8-byte boundary. UCS-2 needs 2 and `EFI_GUID`
+  needs 4; 8 is chosen because edk2's `CompareGuid` reads the structure as two
+  `UINT64`s on 64-bit builds, and because one rule for the whole pool is
+  cheaper to verify than three."
+  8)
+
+(defn- hex-digit [character]
+  (let [code #?(:clj (int character) :cljs (.charCodeAt character 0))]
+    (cond
+      (<= 48 code 57) (- code 48)
+      (<= 97 code 102) (- code 87)
+      (<= 65 code 70) (- code 55)
+      :else nil)))
+
+(defn- hex-bytes
+  "Decode an even-length hex string, or nil if it is not one."
+  [text]
+  (when (even? (count text))
+    (loop [index 0 out []]
+      (if (>= index (count text))
+        out
+        (let [high (hex-digit (nth text index))
+              low (hex-digit (nth text (inc index)))]
+          (if (and high low)
+            (recur (+ index 2) (conj out (+ (* 16 high) low)))
+            nil))))))
+
+(def ^:private guid-field-widths
+  "Hex-digit counts of the five canonical GUID fields."
+  [8 4 4 4 12])
+
+(defn- guid-fields
+  "Split canonical GUID text on `-` into its five hex fields, or nil when the
+  shape is not 8-4-4-4-12 hex digits. Written as a fold over characters rather
+  than with `clojure.string/split`: this namespace deliberately requires
+  nothing, and `split` on a trailing separator drops the empty field, which
+  would make `...-` parse as a four-field GUID."
+  [text]
+  (let [parts (reduce (fn [out character]
+                        (if (= \- character)
+                          (conj out "")
+                          (conj (pop out) (str (peek out) character))))
+                      [""]
+                      text)]
+    (when (and (= 5 (count parts))
+               (= guid-field-widths (mapv count parts))
+               (every? #(some? (hex-bytes %)) parts))
+      parts)))
+
+(defn- surrogate? [code] (<= 0xd800 code 0xdfff))
+
+(defn- utf-16le-nul-bytes [text]
+  (loop [index 0 out []]
+    (if (>= index (count text))
+      (conj out 0 0)
+      (let [code #?(:clj (int (.charAt ^String text index))
+                    :cljs (.charCodeAt text index))]
+        (if (surrogate? code)
+          nil
+          (recur (inc index)
+                 (conj out (bit-and code 0xff) (bit-and (bit-shift-right code 8) 0xff))))))))
+
+(defn rodata-bytes
+  "The bytes ENCODING gives CONTENT, or nil when CONTENT is not a well-formed
+  literal for it. The single authority: `validate!` refuses on nil, and every
+  backend that places a literal pool asks this rather than decoding again."
+  [encoding content]
+  (when (string? content)
+    (case encoding
+      :utf-16le-nul (utf-16le-nul-bytes content)
+      :hex-bytes (hex-bytes content)
+      :guid-mixed-endian
+      (when-let [[a b c d e] (guid-fields content)]
+        (let [[a0 a1 a2 a3] (hex-bytes a)
+              [b0 b1] (hex-bytes b)
+              [c0 c1] (hex-bytes c)]
+          (vec (concat [a3 a2 a1 a0 b1 b0 c1 c0]
+                       (hex-bytes d) (hex-bytes e)))))
+      nil)))
+
+(defn rodata-content?
+  "True when CONTENT is a well-formed literal under ENCODING."
+  [encoding content]
+  (and (contains? rodata-encodings encoding)
+       (some? (rodata-bytes encoding content))))
+;; boot-lit: end
 
 (def capability-kinds
   "Closed native capability boundary. Zero is the scalar callback profile;
@@ -639,6 +794,16 @@
       (when (and (= op :gmir/data-address)
                  (not (string? (:gmir/content instruction))))
         (reject! :invalid-data-content instruction))
+      ;; boot-lit: a literal whose content does not decode under its own
+      ;; encoding is refused HERE, not at the backend that lays out the pool.
+      ;; A malformed GUID has no failure mode downstream -- sixteen bytes get
+      ;; placed either way and the firmware answers `EFI_UNSUPPORTED` for a
+      ;; protocol nobody installed, which is indistinguishable from asking for
+      ;; a protocol this machine does not have.
+      (when (= op :gmir/rodata-address)
+        (when-not (rodata-content? (:gmir/rodata-encoding instruction)
+                                   (:gmir/content instruction))
+          (reject! :invalid-rodata-content instruction)))
       (when (and (= op :gmir/argument)
                  (not (and (integer? (:gmir/index instruction))
                            (not (neg? (:gmir/index instruction))))))

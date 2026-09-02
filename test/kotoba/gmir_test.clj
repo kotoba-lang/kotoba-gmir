@@ -569,6 +569,61 @@
                                 arguments))))))))
 
 ;; ---------------------------------------------------------------------------
+;; xsave: the extended-state enable
+;; ---------------------------------------------------------------------------
+
+(deftest cr4-and-xsetbv-are-the-write-half-of-the-feature-check
+  ;; `:xgetbv` above READS what the operating system has agreed to save. These
+  ;; three are what an operating system uses to AGREE: CR4.OSXSAVE (bit 18) is
+  ;; the bit `xgetbv` faults without, and `xsetbv` is the only way to set the
+  ;; XCR0 bits it then reports.
+  ;;
+  ;; Arities are inherited rather than invented. `:read-cr4`/`:write-cr4` take
+  ;; what `:read-cr0`/`:write-cr0` take, because a control register is one
+  ;; machine word; `:xsetbv` takes what `:write-msr` takes, because both put
+  ;; an index in ECX and a value in EDX:EAX.
+  (is (= {:read-cr4 0 :write-cr4 1 :xsetbv 2}
+         (select-keys gmir/x86-privileged-action-arities
+                      [:read-cr4 :write-cr4 :xsetbv])))
+  ;; Pinned beside them: the registers they join keep their own arities, so a
+  ;; change that widened the whole family fails here rather than in a kernel.
+  (is (= {:read-cr0 0 :write-cr0 1 :read-cr2 0 :read-cr3 0 :write-cr3 1
+          :read-msr 1 :write-msr 2 :xgetbv 1}
+         (select-keys gmir/x86-privileged-action-arities
+                      [:read-cr0 :write-cr0 :read-cr2 :read-cr3 :write-cr3
+                       :read-msr :write-msr :xgetbv])))
+  ;; There is no `:write-cr2`. CR2 is written by the CPU on a page fault and a
+  ;; kernel that wrote it would be lying to its own handler. Asserted rather
+  ;; than merely absent, because "we did not add it" and "it must not be here"
+  ;; read identically in a diff.
+  (is (not (contains? gmir/x86-privileged-action-arities :write-cr2)))
+  (doseq [[action arity] [[:read-cr4 0] [:write-cr4 1] [:xsetbv 2]]]
+    (let [arguments (subvec [v0 v1] 0 arity)
+          program {:gmir/version 1
+                   :gmir/instructions
+                   (vec (concat
+                         (map (fn [register value]
+                                {:gmir/op :gmir/constant :gmir/dst register
+                                 :gmir/value value})
+                              arguments (range 1 (inc arity)))
+                         [{:gmir/op :gmir/x86-privileged :gmir/dst v4
+                           :gmir/action action :gmir/arguments arguments}
+                          {:gmir/op :gmir/return :gmir/value v4}]))}]
+      (testing (str action " is admitted at its declared arity")
+        (is (= program (gmir/validate! program))))
+      (testing (str action " refuses one argument too many")
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (assoc-in program [:gmir/instructions arity :gmir/arguments]
+                                (conj arguments v5))))))
+      (when (pos? arity)
+        (testing (str action " refuses one argument too few")
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (gmir/validate!
+                        (assoc-in program [:gmir/instructions arity :gmir/arguments]
+                                  (pop arguments))))))))))
+
+;; ---------------------------------------------------------------------------
 ;; isr: the interrupt entry address
 ;; ---------------------------------------------------------------------------
 

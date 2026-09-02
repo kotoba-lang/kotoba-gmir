@@ -1,4 +1,4 @@
-# ADR 0014: a quantized row is a vector of blocks, not a vector of elements
+# ADR 0023: a quantized row is a vector of blocks, not a vector of elements
 
 Status: accepted. Date: 2026-09-02.
 
@@ -51,7 +51,6 @@ the limit is the derived minimum. Suite: 39 tests / 399 assertions.
 Break-checked: the Q8_0 stride as 32 rather than 34 reddens
 `fused-dequant-dot-strides-are-the-c-block-sizes` by name.
 
-The emitter, the oracle and the execution evidence are kotoba-native ADR 0052.
+The emitter, the oracle and the execution evidence are kotoba-native ADR 0066.
 
-The oracle is kotoba-kir ADR 0241 and the probe that boots it is aiueos ADR
-0143.
+The oracle is kotoba-kir ADR 0256 and the probe that boots it is aiueos ADR 0165.

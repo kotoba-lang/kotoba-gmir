@@ -734,3 +734,89 @@
   (is (not (contains? gmir/kernel-window-operations :gmir/kernel-dot-f32)))
   (is (not (contains? gmir/slice-operations :gmir/kernel-dot-f32)))
   (is (not (contains? gmir/kernel-atomic-ops :gmir/kernel-dot-f32))))
+
+;; ---------------------------------------------------------------------------
+;; dequant: the fused dequantize-and-dot family.
+;; ---------------------------------------------------------------------------
+
+(defn- dequant-program
+  ([op] (dequant-program op {}))
+  ([op overrides]
+   {:gmir/version 1
+    :gmir/instructions
+    [(merge {:gmir/op op :gmir/dst v5
+             :gmir/base v0 :gmir/length v1
+             :gmir/second-base v2 :gmir/second-length v3
+             :gmir/count v4
+             :gmir/maximum gmir/kernel-dequant-dot-maximum}
+            overrides)
+     {:gmir/op :gmir/return :gmir/value v5}]}))
+
+(deftest fused-dequant-dot-carries-two-regions-and-one-block-count
+  (doseq [op (sort gmir/kernel-dequant-dot-operations)]
+    (let [program (dequant-program op)]
+      (is (= program (gmir/validate! program)) (str op " is canonical"))
+
+      (testing "every operand must be a virtual register"
+        (doseq [field [:gmir/dst :gmir/base :gmir/length
+                       :gmir/second-base :gmir/second-length :gmir/count]]
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (gmir/validate!
+                        (assoc-in program [:gmir/instructions 0 field] 7)))
+              (str op " " field " must be a vreg"))))
+
+      (testing "the keyset is exact -- neither field may be dropped"
+        (doseq [field [:gmir/second-base :gmir/second-length :gmir/count
+                       :gmir/maximum]]
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (gmir/validate!
+                        (update-in program [:gmir/instructions 0] dissoc field)))
+              (str op " " field " is mandatory"))))
+
+      (testing "and nothing may be added to it"
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (assoc-in program [:gmir/instructions 0 :gmir/index] v0)))
+            (str op " admits no index")))
+
+      (testing "the ceiling is 65536 and nothing else"
+        (doseq [maximum [512 4096 16384 65535 0]]
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (gmir/validate! (dequant-program op {:gmir/maximum maximum})))
+              (str op " " maximum " is not the ceiling")))))))
+
+(deftest fused-dequant-dot-strides-are-the-c-block-sizes
+  ;; `sizeof(block_*)` in os/aiueos/kernel/qwen35_quant.c, where a
+  ;; negative-array typedef asserts each one, and that format's QK.
+  (is (= {:block-bytes 34 :block-elements 32}
+         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-q8-0)))
+  (is (= {:block-bytes 144 :block-elements 256}
+         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-q4-k)))
+  (is (= {:block-bytes 210 :block-elements 256}
+         (get gmir/kernel-dequant-dot-formats :gmir/kernel-dequant-dot-q6-k))))
+
+(deftest fused-dequant-dot-block-limit-is-derived-from-both-strides
+  ;; The limit is the SMALLER of what each region can hold, and it is what
+  ;; keeps both `count * block-bytes` and `count * elements * 4` from
+  ;; wrapping before they are compared with a length.
+  (is (= 65536 gmir/kernel-dequant-dot-maximum))
+  (doseq [[op {:keys [block-bytes block-elements]}] gmir/kernel-dequant-dot-formats]
+    (is (= (min (quot 65536 block-bytes) (quot 65536 (* 4 block-elements)))
+           (gmir/kernel-dequant-dot-block-limit op))
+        (str op " limit is derived")))
+  ;; Measured: every one of the three is bounded by its f32 side, which is
+  ;; how all three admit exactly 16384 elements.
+  (is (= 512 (gmir/kernel-dequant-dot-block-limit :gmir/kernel-dequant-dot-q8-0)))
+  (is (= 64 (gmir/kernel-dequant-dot-block-limit :gmir/kernel-dequant-dot-q4-k)))
+  (is (= 64 (gmir/kernel-dequant-dot-block-limit :gmir/kernel-dequant-dot-q6-k)))
+  (doseq [[op {:keys [block-elements]}] gmir/kernel-dequant-dot-formats]
+    (is (= gmir/kernel-dot-f32-element-limit
+           (* block-elements (gmir/kernel-dequant-dot-block-limit op)))
+        (str op " admits the same element count the f32 dot product does"))))
+
+(deftest fused-dequant-dot-is-not-a-member-of-the-indexed-memory-families
+  (doseq [op gmir/kernel-dequant-dot-operations]
+    (is (not (contains? gmir/kernel-window-operations op)))
+    (is (not (contains? gmir/slice-operations op)))
+    (is (not (contains? gmir/kernel-atomic-ops op)))
+    (is (not= :gmir/kernel-dot-f32 op))))

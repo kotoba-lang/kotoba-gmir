@@ -64,6 +64,30 @@
              gmir/validate!
              (get-in [:gmir/instructions 1 :gmir/op])))))
 
+(deftest closed-f32-bit-pattern-family-is-admitted
+  (doseq [op [:gmir/f32-add :gmir/f32-subtract :gmir/f32-multiply
+              :gmir/f32-divide :gmir/f32-min :gmir/f32-max
+              :gmir/f32-equal :gmir/f32-less-than :gmir/f32-less-or-equal
+              :gmir/f32-greater-than :gmir/f32-greater-or-equal
+              :gmir/f32-unordered]]
+    (is (= op
+           (-> {:gmir/version 1
+                :gmir/instructions
+                [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+                 {:gmir/op :gmir/argument :gmir/dst v1 :gmir/index 1}
+                 {:gmir/op op :gmir/dst v2 :gmir/left v0 :gmir/right v1}
+                 {:gmir/op :gmir/return :gmir/value v2}]}
+               gmir/validate!
+               (get-in [:gmir/instructions 2 :gmir/op])))))
+  (is (= :gmir/f32-sqrt
+         (-> {:gmir/version 1
+              :gmir/instructions
+              [{:gmir/op :gmir/argument :gmir/dst v0 :gmir/index 0}
+               {:gmir/op :gmir/f32-sqrt :gmir/dst v1 :gmir/input v0}
+               {:gmir/op :gmir/return :gmir/value v1}]}
+             gmir/validate!
+             (get-in [:gmir/instructions 1 :gmir/op])))))
+
 (deftest bounded-kernel-memory-family-is-admitted
   (let [constants (mapv (fn [register value]
                           {:gmir/op :gmir/constant :gmir/dst register

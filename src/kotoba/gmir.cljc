@@ -47,6 +47,19 @@
    :gmir/shift-left #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/shift-right-signed #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/shift-right-unsigned #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-add #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-subtract #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-multiply #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-divide #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-min #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-max #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-sqrt #{:gmir/op :gmir/dst :gmir/input}
+   :gmir/f32-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-less-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-less-or-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-greater-than #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-greater-or-equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
+   :gmir/f32-unordered #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/f64-add #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/f64-subtract #{:gmir/op :gmir/dst :gmir/left :gmir/right}
    :gmir/f64-multiply #{:gmir/op :gmir/dst :gmir/left :gmir/right}

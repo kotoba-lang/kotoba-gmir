@@ -220,6 +220,32 @@
                           :gmir/second-base :gmir/second-length
                           :gmir/count :gmir/maximum}
    ;; simd: end
+   ;; dequant: the fused dequantize-and-dot family, one operation per
+   ;; quantization format.
+   ;;
+   ;; THE OPERAND SHAPE IS BLOCK-SCALE, NOT TWO REGIONS AND A COUNT. A
+   ;; quantized row is not a vector of elements; it is a vector of BLOCKS,
+   ;; each holding a scale and a run of packed codes, and the byte stride and
+   ;; the element stride are DIFFERENT numbers (34 bytes carry 32 elements in
+   ;; Q8_0; 144 bytes carry 256 in Q4_K). So `:gmir/count` counts BLOCKS here
+   ;; where `:gmir/kernel-dot-f32` counts elements, and both spans are derived
+   ;; from it by the format's own strides. Nothing downstream may assume the
+   ;; two regions have the same length.
+   ;;
+   ;; The keyset is `:gmir/kernel-dot-f32`'s, deliberately: the second region
+   ;; is still a base and a length at position 2, the answer is still one
+   ;; f32 word, and every pass that already walks those keys keeps working.
+   ;; What differs is only the arithmetic between them, which is the format.
+   :gmir/kernel-dequant-dot-q8-0 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                   :gmir/second-base :gmir/second-length
+                                   :gmir/count :gmir/maximum}
+   :gmir/kernel-dequant-dot-q4-k #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                   :gmir/second-base :gmir/second-length
+                                   :gmir/count :gmir/maximum}
+   :gmir/kernel-dequant-dot-q6-k #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                   :gmir/second-base :gmir/second-length
+                                   :gmir/count :gmir/maximum}
+   ;; dequant: end
    :gmir/kernel-subregion #{:gmir/op :gmir/dst :gmir/base :gmir/length
                             :gmir/offset :gmir/size}
    :gmir/equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -299,6 +325,39 @@
   a 64-bit multiply before it is compared."
   (quot kernel-dot-f32-maximum 4))
 ;; simd: end
+
+;; dequant: the fused family's strides and ceilings.
+;;
+;; ONE TABLE, because every consumer of this family needs the same two
+;; numbers and a second transcription of them is a second place for them to
+;; be wrong. `:block-bytes` is `sizeof(block_*)` in
+;; `os/aiueos/kernel/qwen35_quant.c` (asserted there by a negative-array
+;; typedef); `:block-elements` is that format's QK.
+(def kernel-dequant-dot-formats
+  {:gmir/kernel-dequant-dot-q8-0 {:block-bytes 34  :block-elements 32}
+   :gmir/kernel-dequant-dot-q4-k {:block-bytes 144 :block-elements 256}
+   :gmir/kernel-dequant-dot-q6-k {:block-bytes 210 :block-elements 256}})
+
+(def kernel-dequant-dot-operations (set (keys kernel-dequant-dot-formats)))
+
+(def kernel-dequant-dot-maximum
+  "The byte ceiling on EACH region, the same 65536 the f32 dot product
+  declares. Shared rather than derived per format: the ceiling describes what
+  a caller may declare as a window, and that is a property of the window
+  discipline, not of the encoding inside it."
+  kernel-dot-f32-maximum)
+
+(defn kernel-dequant-dot-block-limit
+  "How many blocks the ceiling admits for OP. DERIVED from both strides and
+  from the ceiling, so no copy of it can drift: it is the smaller of what the
+  packed region can hold and what the f32 region can hold, and bounding the
+  block count is what keeps `count * block-bytes` and `count * elements * 4`
+  from wrapping a 64-bit multiply before either is compared with a length."
+  [op]
+  (let [{:keys [block-bytes block-elements]} (get kernel-dequant-dot-formats op)]
+    (min (quot kernel-dequant-dot-maximum block-bytes)
+         (quot kernel-dequant-dot-maximum (* 4 block-elements)))))
+;; dequant: end
 
 ;; sysops: the general atomic read-modify-write family, named once so the
 ;; keyset table, the operand check and the ceiling check cannot drift apart --
@@ -873,6 +932,11 @@
         (when-not (= kernel-dot-f32-maximum (:gmir/maximum instruction))
           (reject! :invalid-kernel-memory-maximum instruction)))
       ;; simd: end
+      ;; dequant: same rule, one ceiling for the whole family.
+      (when (contains? kernel-dequant-dot-operations op)
+        (when-not (= kernel-dequant-dot-maximum (:gmir/maximum instruction))
+          (reject! :invalid-kernel-memory-maximum instruction)))
+      ;; dequant: end
       (when (contains? #{:gmir/label :gmir/branch-zero :gmir/jump} op)
         (let [id (if (= op :gmir/label)
                    (:gmir/id instruction)

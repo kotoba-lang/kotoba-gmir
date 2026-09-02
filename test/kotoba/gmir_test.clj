@@ -532,3 +532,38 @@
                       (assoc-in program [:gmir/instructions arity :gmir/arguments]
                                 (conj arguments v5)))))))))
 
+
+;; ---------------------------------------------------------------------------
+;; simdprep: the extended control register read
+;; ---------------------------------------------------------------------------
+
+(deftest xgetbv-takes-the-xcr-index-and-nothing-else
+  ;; `xgetbv` reads XCR[ecx] into edx:eax: one argument, one i64 result
+  ;; carrying both halves. It is a separate action from the `cpuid` four
+  ;; beside it because it answers a different question -- they say what the
+  ;; CPU implements, this says what the OPERATING SYSTEM has agreed to save
+  ;; and restore across a context switch. A kernel that reads only the first
+  ;; and uses YMM anyway does not fault; it computes wrong answers
+  ;; intermittently and only under load.
+  (is (= 1 (:xgetbv gmir/x86-privileged-action-arities)))
+  ;; The `cpuid` four are arity 2 -- (leaf, subleaf) -- and always have been.
+  ;; Pinned beside it because a `cpuid-subleaf-*` family was proposed on the
+  ;; belief that they took only a leaf.
+  (is (= {:cpuid-eax 2 :cpuid-ebx 2 :cpuid-ecx 2 :cpuid-edx 2}
+         (select-keys gmir/x86-privileged-action-arities
+                      [:cpuid-eax :cpuid-ebx :cpuid-ecx :cpuid-edx])))
+  (let [program {:gmir/version 1
+                 :gmir/instructions
+                 [{:gmir/op :gmir/constant :gmir/dst v0 :gmir/value 0}
+                  {:gmir/op :gmir/x86-privileged :gmir/dst v1
+                   :gmir/action :xgetbv :gmir/arguments [v0]}
+                  {:gmir/op :gmir/return :gmir/value v1}]}]
+    (is (= program (gmir/validate! program))
+        "one argument is admitted")
+    (doseq [[label arguments] [["no arguments" []]
+                               ["two arguments" [v0 v0]]]]
+      (testing (str :xgetbv " refuses " label)
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (assoc-in program [:gmir/instructions 1 :gmir/arguments]
+                                arguments))))))))

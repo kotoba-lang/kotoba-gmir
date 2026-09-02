@@ -567,3 +567,70 @@
                      (gmir/validate!
                       (assoc-in program [:gmir/instructions 1 :gmir/arguments]
                                 arguments))))))))
+
+;; ---------------------------------------------------------------------------
+;; simd: the f32 dot product.
+;; ---------------------------------------------------------------------------
+
+(defn- dot-program
+  ([] (dot-program {}))
+  ([overrides]
+   {:gmir/version 1
+    :gmir/instructions
+    [(merge {:gmir/op :gmir/kernel-dot-f32 :gmir/dst v5
+             :gmir/base v0 :gmir/length v1
+             :gmir/second-base v2 :gmir/second-length v3
+             :gmir/count v4
+             :gmir/maximum gmir/kernel-dot-f32-maximum}
+            overrides)
+     {:gmir/op :gmir/return :gmir/value v5}]}))
+
+(deftest f32-dot-product-carries-two-regions-and-one-count
+  (let [program (dot-program)]
+    (is (= program (gmir/validate! program)))
+
+    (testing "every operand must be a virtual register"
+      (doseq [field [:gmir/dst :gmir/base :gmir/length
+                     :gmir/second-base :gmir/second-length :gmir/count]]
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (assoc-in program [:gmir/instructions 0 field] 7)))
+            (str field " must be a vreg"))))
+
+    (testing "the keyset is exact -- neither field may be dropped"
+      (doseq [field [:gmir/second-base :gmir/second-length :gmir/count
+                     :gmir/maximum]]
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (update-in program [:gmir/instructions 0] dissoc field)))
+            (str field " is mandatory"))))
+
+    (testing "and nothing may be added to it"
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (gmir/validate!
+                    (assoc-in program [:gmir/instructions 0 :gmir/index] v0)))))
+
+    (testing "the ceiling is 65536 and nothing else"
+      (doseq [maximum [512 4096 16384 65535 0]]
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate! (dot-program {:gmir/maximum maximum})))
+            (str maximum " is not the ceiling"))))))
+
+(deftest f32-dot-product-element-limit-is-derived-from-the-byte-ceiling
+  ;; Written once and derived, so a change to the ceiling cannot leave a
+  ;; stale element bound behind it. The element bound is what keeps
+  ;; `count * 4` from wrapping before it is compared against a length.
+  (is (= 65536 gmir/kernel-dot-f32-maximum))
+  (is (= 16384 gmir/kernel-dot-f32-element-limit))
+  (is (= gmir/kernel-dot-f32-element-limit
+         (quot gmir/kernel-dot-f32-maximum 4)))
+  ;; It is NOT the slice family's address-space bound: a region this
+  ;; operation reads is a declared window, not the ADR 0285 carrier.
+  (is (not= gmir/slice-item-limit gmir/kernel-dot-f32-maximum)))
+
+(deftest f32-dot-product-is-not-a-member-of-the-indexed-memory-families
+  ;; It carries no `:gmir/index`, so it must not be admitted by, or bounded
+  ;; by, the tables that describe element-at-a-time access.
+  (is (not (contains? gmir/kernel-window-operations :gmir/kernel-dot-f32)))
+  (is (not (contains? gmir/slice-operations :gmir/kernel-dot-f32)))
+  (is (not (contains? gmir/kernel-atomic-ops :gmir/kernel-dot-f32))))

@@ -349,3 +349,88 @@
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate! (assoc-in program path value)))
           [path value]))))
+
+;; ---------------------------------------------------------------------------
+;; sysops: barriers, the timestamp counter, GS-base swap, and the general
+;; atomic read-modify-write family.
+;; ---------------------------------------------------------------------------
+
+(deftest sysops-privileged-actions-are-zero-arity-and-closed
+  (is (= {:fence-load 0 :fence-store 0 :fence-full 0
+          :rdtsc 0 :rdtscp 0 :swapgs 0}
+         (select-keys gmir/x86-privileged-action-arities
+                      [:fence-load :fence-store :fence-full
+                       :rdtsc :rdtscp :swapgs])))
+  (doseq [action [:fence-load :fence-store :fence-full :rdtsc :rdtscp :swapgs]]
+    (let [program {:gmir/version 1
+                   :gmir/instructions
+                   [{:gmir/op :gmir/x86-privileged :gmir/dst v0
+                     :gmir/action action :gmir/arguments []}
+                    {:gmir/op :gmir/return :gmir/value v0}]}]
+      (testing (str action " is admitted with no arguments")
+        (is (= program (gmir/validate! program))))
+      (testing (str action " owns its exact arity")
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (assoc-in program [:gmir/instructions 0 :gmir/arguments]
+                                [v1]))))))))
+
+(defn- atomic-instruction [op]
+  (cond-> {:gmir/op op :gmir/dst v4 :gmir/base v0 :gmir/length v1
+           :gmir/index v2 :gmir/stored v3 :gmir/maximum 4096}
+    (contains? #{:gmir/kernel-cmpxchg-u32 :gmir/kernel-cmpxchg-u64} op)
+    (assoc :gmir/expected v3)))
+
+(defn- atomic-program [op]
+  {:gmir/version 1
+   :gmir/instructions [(atomic-instruction op)
+                       {:gmir/op :gmir/return :gmir/value v4}]})
+
+(deftest general-atomics-are-a-closed-family
+  (is (= #{:gmir/kernel-atomic-add-u32 :gmir/kernel-atomic-add-u64
+           :gmir/kernel-xchg-u32 :gmir/kernel-xchg-u64
+           :gmir/kernel-cmpxchg-u32 :gmir/kernel-cmpxchg-u64}
+         gmir/kernel-atomic-ops))
+  (is (= 6 (count gmir/kernel-atomic-ops)))
+  (doseq [op gmir/kernel-atomic-ops]
+    (testing (str op)
+      (let [program (atomic-program op)]
+        (is (= program (gmir/validate! program)))
+        (testing "the ceiling is 4096 and nothing else"
+          (doseq [maximum [512 4095 16384 0]]
+            (is (thrown? clojure.lang.ExceptionInfo
+                         (gmir/validate!
+                          (assoc-in program [:gmir/instructions 0 :gmir/maximum]
+                                    maximum))))))
+        (testing "every operand must be a virtual register"
+          (doseq [field [:gmir/base :gmir/length :gmir/index :gmir/stored]]
+            (is (thrown? clojure.lang.ExceptionInfo
+                         (gmir/validate!
+                          (assoc-in program [:gmir/instructions 0 field] 7)))
+                field)))
+        (testing "the keyset is exact"
+          (is (thrown? clojure.lang.ExceptionInfo
+                       (gmir/validate!
+                        (assoc-in program [:gmir/instructions 0 :gmir/offset]
+                                  v3)))))))))
+
+(deftest compare-exchange-requires-a-guest-comparand
+  (testing "the comparand is mandatory and must be a register"
+    (doseq [op [:gmir/kernel-cmpxchg-u32 :gmir/kernel-cmpxchg-u64]]
+      (let [program (atomic-program op)]
+        (is (= program (gmir/validate! program)))
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (update-in program [:gmir/instructions 0]
+                                 dissoc :gmir/expected))))
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (gmir/validate!
+                      (assoc-in program [:gmir/instructions 0 :gmir/expected]
+                                0)))))))
+  (testing "the add and swap forms have no comparand field"
+    (doseq [op [:gmir/kernel-atomic-add-u32 :gmir/kernel-atomic-add-u64
+                :gmir/kernel-xchg-u32 :gmir/kernel-xchg-u64]]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (gmir/validate!
+                    (assoc-in (atomic-program op)
+                              [:gmir/instructions 0 :gmir/expected] v3)))))))

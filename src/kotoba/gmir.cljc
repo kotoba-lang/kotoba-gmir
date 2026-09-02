@@ -77,6 +77,34 @@
                                :gmir/index :gmir/maximum}
    :gmir/kernel-unlock-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
                              :gmir/index :gmir/maximum}
+   ;; sysops: the general atomic family. The lock pair above fixes both its
+   ;; comparand and its replacement, which is what makes it a lock; these six
+   ;; take the word from the guest, which is what makes them the read-modify-
+   ;; writes a device driver's descriptor ring needs -- a producer index the
+   ;; guest advances by its own delta, an ownership word it swaps for its own
+   ;; value, a doorbell it claims against its own comparand.
+   ;;
+   ;; They carry exactly the store's fields, plus `:gmir/expected` for the two
+   ;; compare-exchanges. `:gmir/stored` is the guest's operand in every case:
+   ;; the addend for `atomic-add`, the replacement for `xchg` and `cmpxchg`.
+   ;; `:gmir/dst` is the word that was in memory BEFORE the operation, for all
+   ;; six -- a compare-exchange that returned only a success flag would force
+   ;; the caller to re-read, which is the race the instruction exists to close.
+   :gmir/kernel-atomic-add-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                 :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/kernel-atomic-add-u64 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                 :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/kernel-xchg-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/kernel-xchg-u64 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                           :gmir/index :gmir/stored :gmir/maximum}
+   :gmir/kernel-cmpxchg-u32 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                              :gmir/index :gmir/expected :gmir/stored
+                              :gmir/maximum}
+   :gmir/kernel-cmpxchg-u64 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                              :gmir/index :gmir/expected :gmir/stored
+                              :gmir/maximum}
+   ;; sysops: end
    :gmir/kernel-subregion #{:gmir/op :gmir/dst :gmir/base :gmir/length
                             :gmir/offset :gmir/size}
    :gmir/equal #{:gmir/op :gmir/dst :gmir/left :gmir/right}
@@ -95,6 +123,16 @@
    :gmir/capability-call #{:gmir/op :gmir/dst :gmir/capability
                            :gmir/kind :gmir/arguments}
    :gmir/return #{:gmir/op :gmir/value}})
+
+;; sysops: the general atomic read-modify-write family, named once so the
+;; keyset table, the operand check and the ceiling check cannot drift apart --
+;; and so `kotoba.mir` and `kotoba.native.machine-ir` can derive their own
+;; tables from this one rather than transcribing it.
+(def kernel-atomic-ops
+  #{:gmir/kernel-atomic-add-u32 :gmir/kernel-atomic-add-u64
+    :gmir/kernel-xchg-u32 :gmir/kernel-xchg-u64
+    :gmir/kernel-cmpxchg-u32 :gmir/kernel-cmpxchg-u64})
+;; sysops: end
 
 (def ^:private v1-operations
   (disj (set (keys instruction-keysets)) :gmir/phi :gmir/tail-call))
@@ -179,7 +217,36 @@
    :cli 0 :sti 0 :hlt 0 :pause 0
    :out-u8 2 :out-u32 2 :in-u8 1 :in-u32 1
    :read-msr 1 :write-msr 2
-   :cpuid-eax 2 :cpuid-ebx 2 :cpuid-ecx 2 :cpuid-edx 2})
+   :cpuid-eax 2 :cpuid-ebx 2 :cpuid-ecx 2 :cpuid-edx 2
+   ;; sysops: barriers, the timestamp counter and the GS-base swap.
+   ;;
+   ;; The three barriers are the ordering half of a device driver. A ring
+   ;; descriptor written before a doorbell is only written before the doorbell
+   ;; if something says so, and on x86 that something is `sfence`/`lfence`/
+   ;; `mfence`. They are 0-arity and return 0, exactly like `:cli`.
+   ;;
+   ;; They ride the x86 privileged channel, which `kotoba.mir` admits for the
+   ;; x86-64 target and no other, so they are x86-only by construction. That
+   ;; is a decision, not an oversight: AArch64 has `dmb ishld`/`dmb ishst`/
+   ;; `dmb ish`, but those are barriers under a WEAK memory model where the
+   ;; question they answer is different from the one `lfence`/`sfence` answer
+   ;; under x86-TSO. A portable barrier operator would have to name the
+   ;; ordering it guarantees rather than the instruction it emits, and that is
+   ;; a separate decision with its own operator family -- not a translation of
+   ;; these three.
+   ;;
+   ;; `:rdtsc` and `:rdtscp` return the 64-bit timestamp counter. AArch64's
+   ;; nearest reading, `mrs cntvct_el0`, is a DIFFERENT CLOCK -- a fixed-
+   ;; frequency system counter, not a core cycle counter -- so it is not a
+   ;; translation either.
+   ;;
+   ;; `:swapgs` exchanges GS.base with KERNEL_GS_BASE and returns 0. It is the
+   ;; one instruction a ring-0 entry path cannot express any other way.
+   :fence-load 0 :fence-store 0 :fence-full 0
+   :rdtsc 0 :rdtscp 0
+   :swapgs 0
+   ;; sysops: end
+   })
 
 (def capability-kinds
   "Closed native capability boundary. Zero is the scalar callback profile;
@@ -262,12 +329,20 @@
       (doseq [register (keep instruction [:gmir/dst :gmir/input :gmir/left
                                            :gmir/right :gmir/test :gmir/base
                                            :gmir/length :gmir/stored
+                                           ;; sysops: the compare-exchange
+                                           ;; comparand is an operand like any
+                                           ;; other and must be a vreg.
+                                           :gmir/expected
                                            :gmir/offset :gmir/size])]
         (when-not (vreg? register)
           (reject! :invalid-virtual-register instruction)))
-      (when (and (contains? #{:gmir/kernel-load-u8 :gmir/kernel-store-u8
-                              :gmir/kernel-load-u32 :gmir/kernel-store-u32
-                              :gmir/kernel-try-lock-u32 :gmir/kernel-unlock-u32} op)
+      (when (and (contains? (into #{:gmir/kernel-load-u8 :gmir/kernel-store-u8
+                                    :gmir/kernel-load-u32 :gmir/kernel-store-u32
+                                    :gmir/kernel-try-lock-u32 :gmir/kernel-unlock-u32}
+                                  ;; sysops: the general atomics index the same
+                                  ;; way the loads and stores do.
+                                  kernel-atomic-ops)
+                            op)
                  (not (vreg? (:gmir/index instruction))))
         (reject! :invalid-virtual-register instruction))
       (when (and (= op :gmir/return) (not (vreg? (:gmir/value instruction))))
@@ -341,6 +416,14 @@
       (when (contains? #{:gmir/kernel-try-lock-u32 :gmir/kernel-unlock-u32} op)
         (when-not (= 4096 (:gmir/maximum instruction))
           (reject! :invalid-kernel-memory-maximum instruction)))
+      ;; sysops: the general atomics share the lock pair's single ceiling for
+      ;; the same reason -- one spelling each, naming a page. Pinned as one
+      ;; value rather than a set so a second spelling has to be added
+      ;; deliberately.
+      (when (contains? kernel-atomic-ops op)
+        (when-not (= 4096 (:gmir/maximum instruction))
+          (reject! :invalid-kernel-memory-maximum instruction)))
+      ;; sysops: end
       (when (contains? #{:gmir/label :gmir/branch-zero :gmir/jump} op)
         (let [id (if (= op :gmir/label)
                    (:gmir/id instruction)

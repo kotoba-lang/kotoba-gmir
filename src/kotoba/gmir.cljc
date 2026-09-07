@@ -484,6 +484,11 @@
    :page-fault-recovery-handler-address 0
    :configure-page-fault-recovery 2 :load-idt 2
    :double-fault-handler-address 0
+   ;; amu-h7: the canned #UD handler, zero-arity and an ADDRESS like the three
+   ;; canned handler addresses above it. Vector 6 is the trap this toolchain's
+   ;; own bounded loads and fuel charges raise (`ud2`), so a kernel with no
+   ;; gate for it dies silently; the address lets it install one.
+   :undefined-opcode-handler-address 0
    :configure-double-fault-ist 2 :load-gdt-tss 2
    :probe-guard-write 0 :probe-text-write 0 :probe-nx-execute 0
    :probe-recoverable-guard-write 0 :probe-double-fault 0

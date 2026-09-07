@@ -363,6 +363,7 @@
             :page-fault-recovery-handler-address 0
             :configure-page-fault-recovery 2 :load-idt 2
             :double-fault-handler-address 0
+            :undefined-opcode-handler-address 0
             :configure-double-fault-ist 2 :load-gdt-tss 2
             :probe-guard-write 0 :probe-text-write 0 :probe-nx-execute 0
             :probe-recoverable-guard-write 0 :probe-double-fault 0}
@@ -372,6 +373,7 @@
                          :page-fault-recovery-handler-address
                          :configure-page-fault-recovery :load-idt
                          :double-fault-handler-address
+                         :undefined-opcode-handler-address
                          :configure-double-fault-ist :load-gdt-tss
                          :probe-guard-write :probe-text-write :probe-nx-execute
                          :probe-recoverable-guard-write :probe-double-fault])))
@@ -639,16 +641,18 @@
   ;; names exactly ONE canned handler. This one names any of a table, so the
   ;; vector has to arrive as an operand.
   (is (= 1 (:isr-entry-address gmir/x86-privileged-action-arities)))
-  ;; Pinned beside it: the three canned handler addresses stay zero-arity.
+  ;; Pinned beside it: the four canned handler addresses stay zero-arity.
   ;; They are not members of this table and adding an operand to them would be
   ;; a different change with different bytes.
   (is (= {:page-fault-handler-address 0
           :page-fault-recovery-handler-address 0
-          :double-fault-handler-address 0}
+          :double-fault-handler-address 0
+          :undefined-opcode-handler-address 0}
          (select-keys gmir/x86-privileged-action-arities
                       [:page-fault-handler-address
                        :page-fault-recovery-handler-address
-                       :double-fault-handler-address])))
+                       :double-fault-handler-address
+                       :undefined-opcode-handler-address])))
   (let [program {:gmir/version 1
                  :gmir/instructions
                  [{:gmir/op :gmir/constant :gmir/dst v0 :gmir/value 3}

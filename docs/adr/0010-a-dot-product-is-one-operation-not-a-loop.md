@@ -87,7 +87,7 @@ The operation is not a member of `kernel-window-operations`, `slice-operations`
 or `kernel-atomic-ops`, and carries no `:gmir/index`; the tests assert those
 absences so it cannot drift into a family whose bounds do not describe it.
 
-Verified: `clojure -M:test`, 22 tests / 256 assertions, 0 failures (was
+Verified: `kbb -M:test`, 22 tests / 256 assertions, 0 failures (was
 18/227). Both new gates were shown to discriminate: deleting the ceiling clause
 turns the ceiling assertions red by name, and deleting the three new operand
 names from the register scan turns exactly the three operand assertions red by

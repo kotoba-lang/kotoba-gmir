@@ -73,8 +73,8 @@ call the program does not contain.
 - **ADR-0011 has no file in this repository.** Seven repositories' ADRs cite
   it -- kotoba-mir 0016, kotoba-kir 0235, kotoba-codegen 0010, kotoba-sema
   0007, kotoba-native 0046, kotoba-verifier 0025, amu 0295 -- and the commit
-  that landed the decision (`fe23816`) touched `src/kotoba/gmir.cljc` and
-  `test/kotoba/gmir_rodata_test.clj` and nothing else. The citations are not
+  that landed the decision (`fe23816`) touched `src/kotoba/gmir.cljk` and
+  `test/kotoba/gmir_rodata_test.cljk` and nothing else. The citations are not
   wrong about the DECISION, which is in the source comments at
   `:gmir/rodata-address` and `:uefi-call4`/`:uefi-call6`; they are wrong about
   there being a document. Recorded here rather than fixed, because writing

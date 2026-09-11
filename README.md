@@ -30,5 +30,5 @@ and JSON are not identity encodings.
 ## Test
 
 ```bash
-clojure -M:test
+kbb -M:test
 ```

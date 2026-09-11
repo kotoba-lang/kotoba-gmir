@@ -49,7 +49,7 @@ than a read past the end of a private context.
 
 ## Evidence
 
-`clojure -M:test`: 20 tests, 238 assertions, 0 failures.
+`kbb -M:test`: 20 tests, 238 assertions, 0 failures.
 
 One deliberate break, producing the failure it names and no other: changing
 the arity to 2 turns the arity assertion red and makes the one-argument

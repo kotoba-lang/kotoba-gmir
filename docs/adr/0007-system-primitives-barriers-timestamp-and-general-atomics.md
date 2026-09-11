@@ -64,7 +64,7 @@ set.
 
 ## Evidence
 
-`clojure -M:test`: 16 tests, 171 assertions, 0 failures (measured on this
+`kbb -M:test`: 16 tests, 171 assertions, 0 failures (measured on this
 change).
 
 Both new tests were shown to discriminate before landing:

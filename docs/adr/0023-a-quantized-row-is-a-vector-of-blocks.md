@@ -44,7 +44,7 @@ formats, so all three admit exactly 16384 elements — the same number
 
 ## Evidence
 
-`test/kotoba/gmir_test.clj`, four tests: the keyset is exact in both
+`test/kotoba/gmir_test.cljk`, four tests: the keyset is exact in both
 directions, the ceiling is 65536 and nothing else, the strides are the C's, and
 the limit is the derived minimum. Suite: 39 tests / 399 assertions.
 

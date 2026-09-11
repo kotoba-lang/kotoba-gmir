@@ -1,5 +1,6 @@
 (ns kotoba.gmir
-  "Closed target-independent Generic Machine IR contract.")
+  "Closed target-independent Generic Machine IR contract."
+  {:kotoba/export [capability-kinds function-id? i64-value? instruction-keysets kernel-atomic-ops kernel-dequant-dot-block-limit kernel-dequant-dot-formats kernel-dequant-dot-maximum kernel-dequant-dot-operations kernel-dot-f32-element-limit kernel-dot-f32-maximum kernel-window-maxima kernel-window-operations label? rodata-alignment rodata-bytes rodata-content? rodata-encodings runtime-operation-arities slice-item-limit slice-operations supported-versions validate! version vreg vreg? x86-privileged-action-arities]})
 
 (def version 3)
 (def supported-versions #{1 2 3})

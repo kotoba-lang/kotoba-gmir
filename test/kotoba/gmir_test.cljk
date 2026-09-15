@@ -335,6 +335,9 @@
     (is (= (:vector-assoc gmir/runtime-operation-arities)
            (:vector-assoc-in-place gmir/runtime-operation-arities))
         "the store and the copy are the same operation, so their arities agree")
+    ;; ABI v5 (2026-09-15): the byte search is a host operation, two
+    ;; arguments like `string=?`.
+    (is (= 2 (:string-index-of gmir/runtime-operation-arities)))
     (testing "unknown runtime operations fail closed"
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate!

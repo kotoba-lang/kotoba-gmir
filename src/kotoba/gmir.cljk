@@ -472,7 +472,17 @@
    ;; the bang makes. Neither family gains an f64 twin: KIR declares no
    ;; `vector-f64-alloc` and no `vector-f64-assoc!`.
    :vector-alloc 1
-   :vector-assoc-in-place 3})
+   :vector-assoc-in-place 3
+   ;; ABI v5 (2026-09-15). `(string-index-of haystack needle)` -> the first
+   ;; UTF-8 byte offset of the needle in the haystack, or -1; an empty needle
+   ;; traps, as it does in the reference interpreter. Until now this was a
+   ;; source rewrite over `string-substring` / `string=?` /
+   ;; `string-code-point-at` (kotoba-native's string_search.cljk): one pair
+   ;; handle and three or four host callbacks per haystack byte, so a `grep`
+   ;; over a 3.3 MB file exhausted a 4 Mi-handle arena after 2 MB at about
+   ;; 75 ns/byte. A host slot makes it one call and lets the host use memmem
+   ;; / memchr, the way every fast grep does. Two arguments, like `string=?`.
+   :string-index-of 2})
 
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at

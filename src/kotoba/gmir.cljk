@@ -482,7 +482,15 @@
    ;; over a 3.3 MB file exhausted a 4 Mi-handle arena after 2 MB at about
    ;; 75 ns/byte. A host slot makes it one call and lets the host use memmem
    ;; / memchr, the way every fast grep does. Two arguments, like `string=?`.
-   :string-index-of 2})
+   :string-index-of 2
+   ;; ABI v6 (2026-09-16, superproject ADR-2609160044). The two halves of
+   ;; `(arena-scope body)`: ENTER records the arenas' marks, LEAVE releases
+   ;; every pair handle, pool byte, vector handle and vector item allocated
+   ;; since. They exist only as the paired lowering of that KIR head -- no
+   ;; KIR program names them -- so LIFO holds by construction; the host still
+   ;; traps a leave at depth 0. No arguments, no result that means anything.
+   :arena-enter 0
+   :arena-leave 0})
 
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at

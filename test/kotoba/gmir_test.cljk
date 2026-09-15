@@ -338,6 +338,9 @@
     ;; ABI v5 (2026-09-15): the byte search is a host operation, two
     ;; arguments like `string=?`.
     (is (= 2 (:string-index-of gmir/runtime-operation-arities)))
+    ;; ABI v6 (2026-09-16): the region reset pair, no arguments.
+    (is (= 0 (:arena-enter gmir/runtime-operation-arities)))
+    (is (= 0 (:arena-leave gmir/runtime-operation-arities)))
     (testing "unknown runtime operations fail closed"
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate!

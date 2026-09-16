@@ -511,7 +511,16 @@
    ;; A starting at I against the line of B starting at J, -1/0/1 -- sort's
    ;; merge and uniq cut two views per comparison).
    :string-index-of-from 3
-   :string-compare-lines 4})
+   :string-compare-lines 4
+   ;; ABI v10 (2026-09-16). Two operations that take no VIEW and mint none:
+   ;; `string-find-byte` (the first offset at or after FROM holding the ASCII
+   ;; byte B, -1 when none -- a line walk's newline or delimiter search
+   ;; without a needle handle per search), `string-append-range` (ACC with
+   ;; bytes [START, END) of S appended -- one call where a view and a
+   ;; concat were two, and a handle fewer). Measured 2026-09-16: a 33 MB
+   ;; `cut -f2` spent 44% of its time minting views.
+   :string-find-byte 3
+   :string-append-range 4})
 
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at

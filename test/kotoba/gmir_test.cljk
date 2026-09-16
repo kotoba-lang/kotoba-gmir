@@ -349,6 +349,9 @@
     ;; ABI v8 (2026-09-16): the two line slots.
     (is (= 3 (:string-index-of-from gmir/runtime-operation-arities)))
     (is (= 4 (:string-compare-lines gmir/runtime-operation-arities)))
+    ;; ABI v10 (2026-09-16): the two range slots.
+    (is (= 3 (:string-find-byte gmir/runtime-operation-arities)))
+    (is (= 4 (:string-append-range gmir/runtime-operation-arities)))
     (testing "unknown runtime operations fail closed"
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate!

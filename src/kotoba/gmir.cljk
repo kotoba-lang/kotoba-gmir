@@ -502,7 +502,16 @@
    :string-compare 2
    :string-fold-ascii 1
    :string-find-blank 2
-   :string-skip-blank 2})
+   :string-skip-blank 2
+   ;; ABI v8 (2026-09-16). Two more the line-oriented commands measured to
+   ;; need: `string-index-of-from` (the first occurrence of NEEDLE in S at
+   ;; or after byte offset FROM, absolute, -1 when none -- every line walk
+   ;; was cutting a view to search from an offset, a handle per search),
+   ;; `string-compare-lines` (byte order of the newline-terminated line of
+   ;; A starting at I against the line of B starting at J, -1/0/1 -- sort's
+   ;; merge and uniq cut two views per comparison).
+   :string-index-of-from 3
+   :string-compare-lines 4})
 
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at

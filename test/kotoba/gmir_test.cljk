@@ -341,6 +341,11 @@
     ;; ABI v6 (2026-09-16): the region reset pair, no arguments.
     (is (= 0 (:arena-enter gmir/runtime-operation-arities)))
     (is (= 0 (:arena-leave gmir/runtime-operation-arities)))
+    ;; ABI v7 (2026-09-16): the four text slots.
+    (is (= 2 (:string-compare gmir/runtime-operation-arities)))
+    (is (= 1 (:string-fold-ascii gmir/runtime-operation-arities)))
+    (is (= 2 (:string-find-blank gmir/runtime-operation-arities)))
+    (is (= 2 (:string-skip-blank gmir/runtime-operation-arities)))
     (testing "unknown runtime operations fail closed"
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate!

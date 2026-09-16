@@ -490,7 +490,19 @@
    ;; KIR program names them -- so LIFO holds by construction; the host still
    ;; traps a leave at depth 0. No arguments, no result that means anything.
    :arena-enter 0
-   :arena-leave 0})
+   :arena-leave 0
+   ;; ABI v7 (2026-09-16, superproject ADR-2609160044 follow-up). Four text
+   ;; operations the command binaries measured to need on the host side:
+   ;; `string-compare` (byte order, -1/0/1 -- sort's merge spent one host
+   ;; call per code point), `string-fold-ascii` (A-Z to a-z, a new string --
+   ;; grep -i folded each line in 26 passes), `string-find-blank` /
+   ;; `string-skip-blank` (the first blank / non-blank byte offset at or
+   ;; after an offset, -1 / length when none -- wc and awk walked words a
+   ;; code point per call).
+   :string-compare 2
+   :string-fold-ascii 1
+   :string-find-blank 2
+   :string-skip-blank 2})
 
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at

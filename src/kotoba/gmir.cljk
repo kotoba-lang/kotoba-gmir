@@ -527,7 +527,19 @@
    ;; concat were two, and a handle fewer). Measured 2026-09-16: a 33 MB
    ;; `cut -f2` spent 44% of its time minting views.
    :string-find-byte 3
-   :string-append-range 4})
+   :string-append-range 4
+   ;; ABI v11 (2026-09-25, superproject adr-2609242330). `:bytes` values and
+   ;; the string constructor. A bytes value is a vector-arena handle, so
+   ;; count / at / empty are the vector slots; these four are what the
+   ;; vector table cannot express: `string-from-utf8` (a validated
+   ;; bytes-to-string copy that names the first bad sequence),
+   ;; `bytes-from-vector` (a copy that refuses an item outside [0,255];
+   ;; also the lowering of vector-i64-from-bytes, whose items always pass),
+   ;; `bytes-slice` (a view) and `bytes-concat` (a copy).
+   :string-from-utf8 1
+   :bytes-from-vector 1
+   :bytes-slice 3
+   :bytes-concat 2})
 
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at

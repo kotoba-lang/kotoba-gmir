@@ -352,6 +352,11 @@
     ;; ABI v10 (2026-09-16): the two range slots.
     (is (= 3 (:string-find-byte gmir/runtime-operation-arities)))
     (is (= 4 (:string-append-range gmir/runtime-operation-arities)))
+    ;; ABI v11 (2026-09-25): the bytes slots and the string constructor.
+    (is (= 1 (:string-from-utf8 gmir/runtime-operation-arities)))
+    (is (= 1 (:bytes-from-vector gmir/runtime-operation-arities)))
+    (is (= 3 (:bytes-slice gmir/runtime-operation-arities)))
+    (is (= 2 (:bytes-concat gmir/runtime-operation-arities)))
     (testing "unknown runtime operations fail closed"
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate!

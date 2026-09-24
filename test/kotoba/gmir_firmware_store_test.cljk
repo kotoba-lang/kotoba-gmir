@@ -6,7 +6,7 @@
   already covers. The frame layout, the out-word's displacement and the
   branchless zero-on-failure belong to the backend and are asserted there;
   which SOURCE may name it belongs to kotoba-sema and to amu."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [kotoba.gmir :as gmir]))
 
 (def ^:private v0 (gmir/vreg 0))

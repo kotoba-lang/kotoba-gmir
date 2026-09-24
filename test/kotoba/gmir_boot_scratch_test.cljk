@@ -7,7 +7,7 @@
   `:gmir/function-address` names a function THIS MODULE declares. Where the
   region sits, how big it is and which instruction reaches a label are the
   backend's and the packager's, and are asserted there."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [kotoba.gmir :as gmir]))
 
 (def ^:private v0 (gmir/vreg 0))

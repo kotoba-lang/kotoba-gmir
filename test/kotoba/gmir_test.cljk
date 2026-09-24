@@ -1,5 +1,5 @@
 (ns kotoba.gmir-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [kotoba.gmir :as gmir]))
 
 (def v0 (gmir/vreg 0))

@@ -6,7 +6,7 @@
   refused rather than placed. The placement -- where in the image the pool
   goes and what instruction reaches it -- belongs to the backend and is
   asserted there."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [kotoba.gmir :as gmir]))
 
 (def ^:private v0 (gmir/vreg 0))

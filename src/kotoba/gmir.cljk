@@ -277,6 +277,11 @@
    :gmir/kernel-dequant-dot-iq3-s #{:gmir/op :gmir/dst :gmir/base :gmir/length
                                   :gmir/second-base :gmir/second-length
                                   :gmir/count :gmir/maximum}
+   ;; dequant-ptq1: Prism's group-128 ternary (ADR 0031). Same keyset: a
+   ;; code is a base-3 digit and the block's one scale is in the block.
+   :gmir/kernel-dequant-dot-ptq1-0 #{:gmir/op :gmir/dst :gmir/base :gmir/length
+                                   :gmir/second-base :gmir/second-length
+                                   :gmir/count :gmir/maximum}
    ;; dequant: end
    :gmir/kernel-subregion #{:gmir/op :gmir/dst :gmir/base :gmir/length
                             :gmir/offset :gmir/size}
@@ -374,7 +379,10 @@
    :gmir/kernel-dequant-dot-iq4-xs {:block-bytes 136 :block-elements 256}
    :gmir/kernel-dequant-dot-iq2-s {:block-bytes 82 :block-elements 256}
    :gmir/kernel-dequant-dot-iq3-xxs {:block-bytes 98 :block-elements 256}
-   :gmir/kernel-dequant-dot-iq3-s {:block-bytes 110 :block-elements 256}})
+   :gmir/kernel-dequant-dot-iq3-s {:block-bytes 110 :block-elements 256}
+   ;; dequant-ptq1: 24 bytes of five trits, 2 bytes of four, an fp16 scale.
+   ;; 402 of the Ternary Bonsai 2 27B artifact's 851 tensors (ADR 0031).
+   :gmir/kernel-dequant-dot-ptq1-0 {:block-bytes 28 :block-elements 128}})
 
 (def kernel-dequant-dot-operations (set (keys kernel-dequant-dot-formats)))
 

@@ -967,10 +967,13 @@
                         (= join (:gmir/target %)))
                   instructions)
         (reject! :phi-critical-edge instruction))
-      (let [join-index (.indexOf instructions
-                                 (first (filter #(and (= :gmir/label (:gmir/op %))
-                                                      (= join (:gmir/id %)))
-                                                instructions)))]
+      (let [join-index (first
+                        (keep-indexed
+                         (fn [candidate-index candidate]
+                           (when (and (= :gmir/label (:gmir/op candidate))
+                                      (= join (:gmir/id candidate)))
+                             candidate-index))
+                         instructions))]
         (when (or (zero? join-index)
                   (not= :gmir/jump (:gmir/op (nth instructions (dec join-index)))))
           (reject! :phi-fallthrough-predecessor instruction))))))

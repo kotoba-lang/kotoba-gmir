@@ -357,6 +357,9 @@
     (is (= 1 (:bytes-from-vector gmir/runtime-operation-arities)))
     (is (= 3 (:bytes-slice gmir/runtime-operation-arities)))
     (is (= 2 (:bytes-concat gmir/runtime-operation-arities)))
+    ;; amu ADR 0353 floor :allocation-budget-native: the per-constructor
+    ;; fuel debit, no arguments.
+    (is (= 0 (:fuel-charge gmir/runtime-operation-arities)))
     (testing "unknown runtime operations fail closed"
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate!

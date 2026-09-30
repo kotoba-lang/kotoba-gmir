@@ -547,7 +547,13 @@
    :string-from-utf8 1
    :bytes-from-vector 1
    :bytes-slice 3
-   :bytes-concat 2})
+   :bytes-concat 2
+   ;; amu ADR 0353 point 7 (floor :allocation-budget-native, 2026-09-30):
+   ;; one unit of the run's fuel, debited in front of every constructor the
+   ;; reference (kotoba.kir `cell-constructor-ops`) charges. No arguments;
+   ;; its result means nothing. It is not a host slot: kotoba-mir addresses
+   ;; it at the context's fuel word, and both encoders emit it inline.
+   :fuel-charge 0})
 
 (def x86-privileged-action-arities
   "Closed x86-64 kernel instruction family. These actions are semantic at

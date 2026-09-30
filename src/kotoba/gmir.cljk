@@ -2,7 +2,7 @@
   "Closed target-independent Generic Machine IR contract."
   {:kotoba/export [max-arity capability-kinds function-id? i64-value? instruction-keysets kernel-atomic-ops kernel-dequant-dot-block-limit kernel-dequant-dot-formats kernel-dequant-dot-maximum kernel-dequant-dot-operations kernel-dot-f32-element-limit kernel-dot-f32-maximum kernel-window-maxima kernel-window-operations label? rodata-alignment rodata-bytes rodata-content? rodata-encodings runtime-operation-arities slice-item-limit slice-operations supported-versions validate! version vreg vreg? x86-privileged-action-arities]}
   #?(:kotoba (:schemas {:form/r [:record :form/r [[:tag :i64] [:s :string] [:n :i64] [:k :keyword]
-                                          [:kids [:list [:ref :form/r]]]]]
+                                          [:kids [:list [:ref :form/r]]] [:span :i64] [:data :bytes]]]
                                  :form/rd [:record :form/rd [[:form [:ref :form/r]] [:pos :i64]]]})))
 
 #?(:kotoba
@@ -27,7 +27,7 @@
 
 #?(:kotoba
    (defn- form-mk [t :i64 s :string n :i64 k :keyword kids [:list [:ref :form/r]]] [:ref :form/r]
-     (record-new [:ref :form/r] t s n k kids)))
+     (record-new [:ref :form/r] t s n k kids 0 (bytes-empty))))
 
 #?(:kotoba
    (defn- form-nil-form [] [:ref :form/r] (form-mk 0 "" 0 :none (form-no-forms))))

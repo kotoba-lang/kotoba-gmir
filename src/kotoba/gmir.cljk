@@ -1792,13 +1792,16 @@
 ;; boot-lit: end
 
 #?(:kotoba
-   (defn capability-kinds [] [:ref :form/r] (form-edn-form "{:i64 0, :string 1, :option-i64 2, :result-i64 3, :clock-v1 4, :dataspace-v1 5, :ui-commit-v1 6, :ui-event-v1 7}"))
+   (defn capability-kinds [] [:ref :form/r] (form-edn-form "{:i64 0, :string 1, :option-i64 2, :result-i64 3, :clock-v1 4, :dataspace-v1 5, :ui-commit-v1 6, :ui-event-v1 7, :bytes-v1 8, :string-bytes-v1 9}"))
    :default
    (def capability-kinds
      "Closed native capability boundary. Zero is the scalar callback profile;
      positive values are the typed host ABI discriminator."
      {:i64 0 :string 1 :option-i64 2 :result-i64 3 :clock-v1 4 :dataspace-v1 5
-      :ui-commit-v1 6 :ui-event-v1 7}))
+      :ui-commit-v1 6 :ui-event-v1 7
+      ;; fs/app-data-bytes (wire 35): a :bytes request and result, and a :string
+      ;; request with a :bytes result. Both are one-word handles (vector arena).
+      :bytes-v1 8 :string-bytes-v1 9}))
 
 
 

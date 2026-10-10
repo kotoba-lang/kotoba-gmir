@@ -361,8 +361,8 @@
     ;; fuel debit, no arguments.
     (is (= 0 (:fuel-charge gmir/runtime-operation-arities)))
     ;; superproject adr-2610092340 D12: the per-form consensus gas debit,
-    ;; no arguments.
-    (is (= 0 (:gas-charge gmir/runtime-operation-arities)))
+    ;; one argument -- the form's weight.
+    (is (= 1 (:gas-charge gmir/runtime-operation-arities)))
     (testing "unknown runtime operations fail closed"
       (is (thrown? clojure.lang.ExceptionInfo
                    (gmir/validate!

@@ -72,11 +72,50 @@ keyset, firmware arity and whole-program checks remain required. Root/caller
 adaptation and resulting Definition CIDs are open; matching literal bytes
 do not imply unchanged definition identity.
 
+## Complete contract tables as a supporting component
+
+`src/kotoba/gmir/catalog.kotoba` carries the owning reference's complete
+92 instruction keysets, 37 runtime operation arities, 55 x86 privileged
+arities, eight existing capability-kind codes, eight dequant formats,
+window/slice/atomic families, version set and numeric ceilings. Large maps
+are typed lists of nominal entries; each keyset is a typed keyword list.
+List order is an implementation detail: consumers use named lookup and set
+membership. Do not treat order as a new instruction encoding or wire index.
+
+The data accessors preserve the original public names. Known-format block
+limits derive the minimum admitted packed/unpacked span as before. The
+native helper returns `[:option :i64]`; an unknown format has no numeric
+limit and returns `None`. Root/caller adaptation must propagate that refusal
+and retain appropriate diagnostic facts; it must not manufacture a default
+or admit unknown formats. This is an explicit API migration candidate, not a
+claim that the old throwing host API has already been replaced compatibly.
+
+`instruction-keys-in` and `operation-allowed-in?` allow a validator to reuse
+one table instead of allocating the complete catalog for every instruction.
+Version admission retains the exact existing exclusions: v1 excludes phi
+and tail-call; v2 excludes call and tail-call; v3 includes every table row.
+Function-address still needs separate module validation; a table lookup is
+not that check. The indexed-memory set remains window + slice + atomics +
+the two lock operations. Capability kinds are still exactly 0..7.
+
+The editorial source-data check compares every copied keyset, arity, format,
+set member and literal scalar with the pinned reference's data. It does not
+run reference code or a generator/compiler. Derived helper expressions
+remain subject to native compilation and runtime verification. The added
+`test/kotoba/gmir_catalog_cases.kotoba` self-check covers table counts,
+uniqueness, lookup/unknown refusal, every row's version admission, all eight
+known format limits and both-span maximality, numeric boundaries, indexed
+families and key runtime/firmware arities. It has not been compiled or run.
+The original four suites remain unchanged and required.
+
 ## Remaining whole-component work
 
-The root canonical GMIR module must wire these four literal exports and
-implement its remaining 24 exports and validators. In addition,
-all native consumers of data accessors/results, proposed capability kinds
+The root canonical GMIR module must wire the 22 public names represented
+by the literal/catalog candidates and implement the remaining six identity,
+constructor, predicate and whole-program validator exports. All root
+instruction checks, phi predecessor/critical-edge/fallthrough rules and
+module linkage/refusal facts still require implementation. No table-only
+slice is whole GMIR. In addition, all native consumers of data accessors/results, proposed capability kinds
 8..11 and matching signature/type/value/lowering/ABI are still required.
 An existing language-side mechanical `.kotoba` projection contains an empty
 `i64-value?` body and host forms. It is migration inventory, not an owning

@@ -108,11 +108,73 @@ known format limits and both-span maximality, numeric boundaries, indexed
 families and key runtime/firmware arities. It has not been compiled or run.
 The original four suites remain unchanged and required.
 
+## Identity/scalar boundary and paged input/refusal data
+
+`node.kotoba`, `identity.kotoba` and `outcome.kotoba` add source candidates
+for the five remaining identity/scalar exports and the full-data refusal
+carrier. This still does not implement or wire `validate!`.
+
+The nominal input carries scalar kind/bits, separate namespace/name, raw
+text chunks and paged children. No program or long literal enters a generic
+document. Namespace absence and an existing empty namespace remain distinct;
+namespace/name components retain their own identity even when two values
+would print alike. This follows the reference's
+[Named/Symbol representation](https://github.com/clojure/clojure/blob/master/src/jvm/clojure/lang/Symbol.java).
+`keyword-literal` is a convenience for reader-canonical native literals;
+adapters for arbitrary interned host values must supply their actual parts,
+including a slash inside an unqualified name, through `keyword-parts` or
+`symbol-parts`. A printed-spelling round trip cannot establish that parity.
+
+Text and children retain existing leaf/list bounds. Each collection may have
+multiple child pages, so the per-list 16,384-item bound is not imposed as a
+new logical instruction-count limit. `child` and `text-slice` report missing
+or invalid ranges explicitly. `text-at` uses -1 for out of range, which is
+not a byte. Named equality does not equate unrelated scalar values.
+
+The i64 predicate handles exact native i64 and checked decimal integer data,
+including the signed extrema, leading zeros and overflow refusal. Negative
+accumulation checks before multiply/subtract so `-2^63` requires no positive
+out-of-range intermediate. The vreg constructor also accepts arbitrary-width
+nonnegative decimal integers, retains all digits in chunks and normalizes
+sign/leading zeros. It does not silently reduce them to i64 or introduce a
+small GMIR index ceiling. Actual native allocation/value bounds still apply.
+
+`vreg` returns a typed result. Its refusal preserves phase, problem, message
+and the full `{:index original-value}` data in nominal nodes. Parent adapters
+must propagate these facts into their final native refusal channel; the old
+throwing root and callers have not been replaced. `label?` and `function-id?`
+operate on explicit components and canonical UTF-8. The added text helpers
+validate split UTF-8 and compare canonical strings in UTF-16 code-unit order,
+including astral/BMP ordering, for later sorted-name diagnostics.
+
+The identity self-check source includes 25 scalar cases, constructor and
+predicate refusals, namespace/name ambiguity, complete refusal facts, text
+slicing and chunk boundaries, 16 UTF-8 vectors and seven text-order cases.
+It checks a 33-child collection and provides a separate full-page rollover
+entry with 16,385 children. All of this is uncompiled/unexecuted. The node
+constructors are data builders: tags alone do not prove a valid reader value,
+well-formed map/set/collection, complete IR admission or authority. Full
+reader/tag/UTF-8/shape admission and invalid-representation refusal remain
+part of root/caller integration. Native allocation/copy/fuel costs remain
+unqualified.
+
+## Additional downstream carrier gap
+
+The current Linux-static draft still has artifact/code-facing `:document`
+carriers, including `linux_static.kotoba`'s `package`/plan interface and
+`normalized-code`. A generic vector/list of code is bounded to 32 elements;
+a bytes document is still bounded by its leaf/serialized representation.
+This does not establish the full logical artifact domain. The complete
+packager/provider/caller route must migrate to typed payload buffers and
+prove resource/refusal behavior. A typed assembler or GMIR supporting
+component alone does not close this downstream gap. No downstream code was
+changed in this source step.
+
 ## Remaining whole-component work
 
-The root canonical GMIR module must wire the 22 public names represented
-by the literal/catalog candidates and implement the remaining six identity,
-constructor, predicate and whole-program validator exports. All root
+The root canonical GMIR module must wire the 27 public names represented
+by the literal/catalog/identity candidates and implement the whole-program
+`validate!` export. All root
 instruction checks, phi predecessor/critical-edge/fallthrough rules and
 module linkage/refusal facts still require implementation. No table-only
 slice is whole GMIR. In addition, all native consumers of data accessors/results, proposed capability kinds

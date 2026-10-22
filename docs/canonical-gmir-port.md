@@ -271,3 +271,14 @@ core/lineage or alter its Embench baseline. The measured compiler's complete
 frontend, lowering, optimizer and backend behavior must be preserved when
 the whole closure is integrated. No benchmark or compiler-core change is
 claimed here.
+
+## Native MIR integration, 2026-10-23
+
+The seven GMIR production units are compiled/linked with the complete canonical
+MIR root by the measured Amu selfhost successor, using exact source SHA-256
+pins and all roots. The full eight-component ordinary MIR aggregate exits
+zero; native catalog cases compare all 92 GMIR direct lookup rows with the
+public table. Pure scalar helpers reclaim only internal temporaries, map-key
+comparison preserves namespace presence and exact bytes, and Option fallbacks
+are lazy. These are production-integration results, not execution of every
+GMIR historical suite or public CLI/target/resolver/CID admission.

@@ -4,15 +4,15 @@
   {:kotoba/export [vreg vreg? label? function-id? i64-value? integer-i64 nonnegative-integer? integer-form?]}
   (:require [kotoba.gmir.node :as node] [kotoba.gmir.outcome :as outcome]))
 
-(defn- digit? [byte :i64] :bool (and (>= byte 48) (<= byte 57)))
+(defn- digit? [byte :i64] :bool (arena-scope (and (>= byte 48) (<= byte 57))))
 (defn- sign-start [text [:ref :gmir.node/text]] :i64
-  (if (or (= (node/text-at text 0) 45) (= (node/text-at text 0) 43)) 1 0))
+  (arena-scope (if (or (= (node/text-at text 0) 45) (= (node/text-at text 0) 43)) 1 0)))
 (defn- decimal? [text [:ref :gmir.node/text]] :bool
-  (let [start (sign-start text) count (node/text-count text)]
+  (arena-scope (let [start (sign-start text) count (node/text-count text)]
     (if (>= start count) false
       (loop [index start]
         (if (>= index count) true
-          (if (digit? (node/text-at text index)) (recur (+ index 1)) false))))))
+          (if (digit? (node/text-at text index)) (recur (+ index 1)) false)))))))
 
 ;; Accumulate negatively, so -2^63 never passes through an unrepresentable
 ;; positive intermediate. The pre-multiply threshold uses truncation toward
@@ -34,9 +34,9 @@
     :integer (parse-i64 (node/name-of value))
     (option-none-of [:option :i64])))
 (defn i64-value? [value [:ref :gmir.node/value]] :bool
-  (option-some?-of [:option :i64] (integer-i64 value)))
+  (arena-scope (option-some?-of [:option :i64] (integer-i64 value))))
 (defn integer-form? [value [:ref :gmir.node/value]] :bool
-  (or (= (node/kind value) :i64) (and (= (node/kind value) :integer) (decimal? (node/name-of value)))))
+  (arena-scope (or (= (node/kind value) :i64) (and (= (node/kind value) :integer) (decimal? (node/name-of value))))))
 
 ;; A nonnegative integer is not restricted to i64. Preserve very large
 ;; indices as decimal text, normalize zero/sign/leading zeros, and let actual
@@ -58,7 +58,7 @@
                 (node/text-slice text index count)))))))
     (option-none-of [:option [:ref :gmir.node/text]])))
 (defn nonnegative-integer? [value [:ref :gmir.node/value]] :bool
-  (option-some?-of [:option [:ref :gmir.node/text]] (index-name value)))
+  (arena-scope (option-some?-of [:option [:ref :gmir.node/text]] (index-name value))))
 (defn vreg [index [:ref :gmir.node/value]] [:result [:ref :gmir.node/value] [:ref :gmir/refusal]]
   (let [name (index-name index)]
     (if (not (option-some?-of [:option [:ref :gmir.node/text]] name))
@@ -67,27 +67,25 @@
       (result-ok-of [:result [:ref :gmir.node/value] [:ref :gmir/refusal]]
         (node/keyword-parts
           (option-some-of [:option [:ref :gmir.node/text]] (node/string-text "kotoba.gmir.vreg"))
-          (option-value-of [:option [:ref :gmir.node/text]] name (node/empty-text)))))))
+          (option-match [:option [:ref :gmir.node/text]] name (node/empty-text) found-value found-value))))))
 (defn vreg? [value [:ref :gmir.node/value]] :bool
-  (let [name (node/name-of value) count (node/text-count name)]
+  (arena-scope (let [name (node/name-of value) count (node/text-count name)]
     (and (= (node/kind value) :keyword) (node/has-namespace? value)
          (node/text-equal?
-           (option-value-of [:option [:ref :gmir.node/text]] (node/namespace-of value) (node/empty-text))
+           (option-match [:option [:ref :gmir.node/text]] (node/namespace-of value) (node/empty-text) found-value found-value)
            (node/string-text "kotoba.gmir.vreg"))
          (> count 0)
          (if (= (node/text-at name 0) 48) (= count 1)
            (and (>= (node/text-at name 0) 49) (<= (node/text-at name 0) 57)
                 (loop [index 1]
                   (if (>= index count) true
-                    (if (digit? (node/text-at name index)) (recur (+ index 1)) false))))))))
+                    (if (digit? (node/text-at name index)) (recur (+ index 1)) false)))))))))
 (defn label? [value [:ref :gmir.node/value]] :bool
-  (and (= (node/kind value) :keyword) (node/has-namespace? value)
+  (arena-scope (and (= (node/kind value) :keyword) (node/has-namespace? value)
        (node/text-valid? (node/name-of value))
-       (node/text-valid? (option-value-of [:option [:ref :gmir.node/text]]
-                           (node/namespace-of value) (node/empty-text)))))
+       (node/text-valid? (option-match [:option [:ref :gmir.node/text]] (node/namespace-of value) (node/empty-text) found-value found-value)))))
 (defn function-id? [value [:ref :gmir.node/value]] :bool
-  (and (= (node/kind value) :symbol) (> (node/text-count (node/name-of value)) 0)
+  (arena-scope (and (= (node/kind value) :symbol) (> (node/text-count (node/name-of value)) 0)
        (node/text-valid? (node/name-of value))
        (or (not (node/has-namespace? value))
-           (node/text-valid? (option-value-of [:option [:ref :gmir.node/text]]
-                               (node/namespace-of value) (node/empty-text))))))
+           (node/text-valid? (option-match [:option [:ref :gmir.node/text]] (node/namespace-of value) (node/empty-text) found-value found-value))))))

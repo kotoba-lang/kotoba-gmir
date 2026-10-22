@@ -28,7 +28,7 @@
   (record-new [:ref :gmir.rodata/input] :keyword value (empty-chunks)))
 (defn invalid-input [] [:ref :gmir.rodata/input]
   (record-new [:ref :gmir.rodata/input] :other :none (empty-chunks)))
-(defn rodata-alignment [] :i64 8)
+(defn rodata-alignment [] :i64 (arena-scope 8))
 (defn rodata-encodings [] :document
   (document-set (document-keyword :utf-16le-nul)
                 (document-keyword :guid-mixed-endian) (document-keyword :hex-bytes)))
@@ -39,7 +39,7 @@
   (option-some-of [:option [:ref :gmir.rodata/decoded]]
     (record-new [:ref :gmir.rodata/decoded] chunks size)))
 (defn decoded-byte-count [value [:ref :gmir.rodata/decoded]] :i64
-  (record-get [:ref :gmir.rodata/decoded] value :size))
+  (arena-scope (record-get [:ref :gmir.rodata/decoded] value :size)))
 (defn decoded-chunks [value [:ref :gmir.rodata/decoded]] [:list :bytes]
   (record-get [:ref :gmir.rodata/decoded] value :chunks))
 (defn decoded-byte-at [value [:ref :gmir.rodata/decoded] index :i64] [:option :i64]
@@ -53,9 +53,9 @@
               (recur (+ chunk 1) (- offset (bytes-count payload))))))))))
 
 (defn- total-bytes [chunks [:list :bytes]] :i64
-  (loop [index 0 total 0]
+  (arena-scope (loop [index 0 total 0]
     (if (>= index (vector-count chunks)) total
-      (recur (+ index 1) (+ total (bytes-count (typed-list-nth [:list :bytes] chunks index)))))))
+      (recur (+ index 1) (+ total (bytes-count (typed-list-nth [:list :bytes] chunks index))))))))
 
 ;; Empty chunks are skipped. Each payload access is checked against its own
 ;; bytes-count; no flattened string or document is constructed.
@@ -70,19 +70,19 @@
     (record-get [:ref :gmir.rodata/read] previous :offset)
     (record-get [:ref :gmir.rodata/read] previous :position)))
 (defn- read-value [value [:ref :gmir.rodata/read]] :i64
-  (record-get [:ref :gmir.rodata/read] value :value))
+  (arena-scope (record-get [:ref :gmir.rodata/read] value :value)))
 (defn- replace-value [value [:ref :gmir.rodata/read] code :i64] [:ref :gmir.rodata/read]
   (record-new [:ref :gmir.rodata/read] code
     (record-get [:ref :gmir.rodata/read] value :chunk)
     (record-get [:ref :gmir.rodata/read] value :offset)
     (record-get [:ref :gmir.rodata/read] value :position)))
-(defn- continuation? [value :i64] :bool (and (>= value 128) (<= value 191)))
+(defn- continuation? [value :i64] :bool (arena-scope (and (>= value 128) (<= value 191))))
 (defn- hex-digit [code :i64] :i64
-  (cond
+  (arena-scope (cond
     (and (>= code 48) (<= code 57)) (- code 48)
     (and (>= code 97) (<= code 102)) (- code 87)
     (and (>= code 65) (<= code 70)) (- code 55)
-    :else -1))
+    :else -1)))
 
 ;; -1 is EOF, -2 is malformed/non-UCS-2. Astral scalars and surrogate code
 ;; points are refused. A code unit may cross any number of source chunks.
@@ -93,13 +93,13 @@
       (and (>= lead 194) (<= lead 223))
       (let [b (following chunks a) tail (read-value b)]
         (if (continuation? tail)
-          (replace-value b (+ (bit-shift-left (bit-and lead 31) 6) (bit-and tail 63)))
+          (replace-value b (+ (i64-shift-left (bit-and lead 31) 6) (bit-and tail 63)))
           (replace-value b -2)))
       (and (>= lead 224) (<= lead 239))
       (let [b (following chunks a) c (following chunks b)
             b1 (read-value b) b2 (read-value c)
-            code (+ (bit-shift-left (bit-and lead 15) 12)
-                    (bit-shift-left (bit-and b1 63) 6) (bit-and b2 63))]
+            code (+ (i64-shift-left (bit-and lead 15) 12)
+                    (i64-shift-left (bit-and b1 63) 6) (bit-and b2 63))]
         (if (and (continuation? b1) (continuation? b2) (>= code 2048)
                  (or (< code 55296) (> code 57343)))
           (replace-value c code) (replace-value c -2)))
@@ -175,12 +175,12 @@
             (record-get [:ref :gmir.rodata/read] next :position)
             (vector-assoc! values index byte)))))))
 (defn- guid-offset [index :i64] :i64
-  (case index 0 6 1 4 2 2 3 0 4 11 5 9 6 16 7 14
-              8 19 9 21 10 24 11 26 12 28 13 30 14 32 15 34 -1))
+  (arena-scope (case index 0 6 1 4 2 2 3 0 4 11 5 9 6 16 7 14
+              8 19 9 21 10 24 11 26 12 28 13 30 14 32 15 34 -1)))
 (defn- decode-guid [chunks [:list :bytes]] [:option [:ref :gmir.rodata/decoded]]
   (let [input (guid-source chunks)]
     (if (not (option-some?-of [:option :bytes] input)) (none)
-      (let [source (option-value-of [:option :bytes] input (bytes-empty))]
+      (let [source (option-match [:option :bytes] input (bytes-empty) found-value found-value)]
         (if (not (and (= (bytes-at source 8) 45) (= (bytes-at source 13) 45)
                       (= (bytes-at source 18) 45) (= (bytes-at source 23) 45))) (none)
           (loop [index 0 values (vector-alloc 16)]
@@ -204,4 +204,4 @@
         :guid-mixed-endian (decode-guid chunks)
         (none)))))
 (defn rodata-content? [encoding [:ref :gmir.rodata/input] content [:ref :gmir.rodata/input]] :bool
-  (option-some?-of [:option [:ref :gmir.rodata/decoded]] (rodata-bytes encoding content)))
+  (arena-scope (option-some?-of [:option [:ref :gmir.rodata/decoded]] (rodata-bytes encoding content))))

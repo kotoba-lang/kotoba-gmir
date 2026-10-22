@@ -11,7 +11,7 @@
        [:data [:ref :gmir.node/value]]]]}))
 
 (defn- at [value [:ref :gmir.node/value] index :i64] [:ref :gmir.node/value]
-  (option-value-of [:option [:ref :gmir.node/value]] (node/child value index) (node/nil-value)))
+  (option-match [:option [:ref :gmir.node/value]] (node/child value index) (node/nil-value) item item))
 (defn- kw-value [value :keyword] [:ref :gmir.node/value] (node/keyword-literal value))
 (defn- sym [value :string] [:ref :gmir.node/value]
   (node/symbol-parts (option-none-of [:option [:ref :gmir.node/text]]) (node/string-text value)))

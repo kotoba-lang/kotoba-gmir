@@ -27,8 +27,20 @@ between checked KIR lowering and target instruction selection.
 GMIR is an abstract data contract. EDN is its reference notation; printed EDN
 and JSON are not identity encodings.
 
-## Test
+## Current migration and CDCI contract
 
-```bash
-kbb -M:test
-```
+Canonical source and tooling use `.kotoba`, Amu selfhost and Kotoba native,
+including the CDCI controller. CLJK/CLJC, JVM/Java/Clojure, NBB/Node and KBB
+are historical port inputs, not required runtime, bootstrap or release gates.
+
+The former Java 21 / Clojure test workflow is retired. No native replacement
+gate is registered by this change. Existing source and the full corpus remain
+unchanged; native compilation/execution, refusal coverage and component
+admission are still open. The compatibility projection in kotoba-lang has an
+empty `i64-value?` body and does not establish a complete canonical validator.
+
+The native capability-kind contract currently ends at discriminator 7. Byte
+request/result kinds and their complete lowering/provider/FS2 closure remain
+open. Removing a hosted job does not activate those shapes or grant authority.
+
+See [the retirement record](docs/hosted-ci-retirement.md).

@@ -13,34 +13,64 @@ an accepted replacement.
 
 ## Owning literal boundary
 
-`src/kotoba/gmir/rodata.kotoba` contains the full literal boundary in canonical
-source: the three encodings, alignment, bytes and content predicate. Public
-data values become typed zero-argument accessors in this component. Generic
-input/output values are documents, preserving unknown encoding/non-string
-refusals and the difference between an empty vector and null.
-Root/caller adaptation and the resulting Definition CIDs are still open;
-unchanged literal bytes do not imply unchanged definition identity.
+`src/kotoba/gmir/rodata.kotoba` is a canonical source candidate for the
+three encodings, alignment, byte decoding and content predicate. Public data
+values become typed zero-argument accessors. The owning root still uses its
+reference implementation; this component has not replaced it or its callers.
 
-- Hex retains exact order, zero bytes, either letter case and empty success;
-  odd lengths and non-hex characters return null.
-- GUID accepts only the canonical 8-4-4-4-12 shape, decodes the first 4/2/2
-  fields little-endian and preserves the last eight bytes in text order.
-- UCS-2 preserves every admitted BMP scalar, embedded zero and the final
-  two-byte terminator. Astral scalars are refused rather than encoded as
-  surrogate pairs, matching the original UTF-16 code-unit walk. Byte reads
-  are bounded; malformed byte sequences also refuse.
+A source review found that the first draft's generic document-vector result
+could not represent literals beyond the unchanged **32-item document
+container limit**. Wrapping a maximum-size native string in a serialized
+document also adds overhead. That draft did not preserve the full literal
+boundary. The revised candidate uses nominal inputs and typed byte chunks;
+it does not widen document/value/ABI limits or narrow the parent grammar.
 
-There is no host string/Java/JS conversion, regex, filesystem/process access,
-new input cap, truncation, replacement character or successful empty fallback.
-No parent whitelist or smaller semantic domain is substituted.
+- `string-input` uses the native string domain (at most 65,536 UTF-8 bytes
+  per value); `chunks-input` carries longer logical UTF-8 text with
+  `[:list :bytes]`, including units split across chunks and empty chunks.
+- `keyword-input` and `invalid-input` retain the distinction between the
+  admitted encoding kind and every other kind. The parent adapter must
+  retain the original AST/value for its full diagnostics.
+- `rodata-bytes` returns `[:option [:ref :gmir.rodata/decoded]]`. `None`
+  means invalid content/encoding. Empty hex is `Some` with zero bytes and
+  no payload chunks. No allocation, uniqueness or value failure is caught
+  and converted into success or empty data.
+- `decoded-chunks`, `decoded-byte-count` and checked `decoded-byte-at`
+  expose all bytes. Private output pieces are at most 16 KiB; this is an
+  allocation strategy, not a logical literal limit. Mutable local vectors
+  are copied with `bytes-from-vector-i64` before crossing helper boundaries;
+  normal compiler uniqueness admission is still required.
 
-The canonical decoder self-check has 32 explicit cases, including every
-decoder input in the legacy rodata suite plus Unicode/NUL boundaries. It
-checks the complete returned byte vector and the content predicate, as well
-as encoding/alignment values. It has not been typechecked, compiled or run.
-The original suite is unchanged and still owns the parent validator/keyset,
-firmware-call arity and whole-program checks; those are not covered by this
-decoder self-check or declared complete.
+Hex retains exact order, zero bytes, either letter case and empty success;
+odd lengths and non-hex characters refuse. GUID accepts exactly the
+8-4-4-4-12 shape, reverses the first 4/2/2-byte fields and preserves the final
+eight bytes. UCS-2 preserves admitted BMP scalars, embedded zero and one
+final two-byte terminator. Astral scalars, surrogates and malformed UTF-8
+refuse. Byte reads are bounded against their own chunks. There is no host
+string/Java/JS conversion, regex, filesystem/process access, replacement
+character, truncation or successful empty fallback.
+
+The revised canonical self-check source retains all 32 original small
+cases, with fixed oracle documents of at most 32 elements, and adds 18
+chunk/UTF-8 cases. `main` also checks seven complete output patterns and
+three refusals after a long prefix: outputs above 32 bytes, 65,536-byte
+native strings, 65,537-byte and 1 MiB logical input, UTF-16 expansion and
+piece boundaries. Pattern comparison walks forward through every byte,
+including the final terminator. A separate `large-internal-case` constructs
+and consumes an 8 MiB decoded hex result and returns only i64.
+
+Long values are constructed and consumed internally. These cases do not
+admit a value above the canonical boundary traversal budget across a public
+export/capability ABI. Per-leaf/list bounds and native arena/fuel/stack
+budgets still apply. Cursor records allocate while decoding, so successful
+large-input execution and its resource cost remain unqualified. No decoder
+or self-check has been typechecked, compiled or run. Source-data inspection
+is not evidence of semantic parity or native resource admission.
+
+The original source and four suites are unchanged. Their parent validator,
+keyset, firmware arity and whole-program checks remain required. Root/caller
+adaptation and resulting Definition CIDs are open; matching literal bytes
+do not imply unchanged definition identity.
 
 ## Remaining whole-component work
 

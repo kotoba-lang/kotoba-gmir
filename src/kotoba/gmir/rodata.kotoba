@@ -1,0 +1,113 @@
+;; Owning canonical source for the complete GMIR literal-decoding boundary.
+;; Reference: gmir.cljk at 1ae0811e. Source candidate, not native qualification.
+(ns kotoba.gmir.rodata
+  {:kotoba/export [rodata-alignment rodata-encodings rodata-bytes rodata-content?]}
+  (:schemas
+   {:gmir.rodata/unit [:record :gmir.rodata/unit [[:code :i64] [:width :i64]]]}))
+
+(defn rodata-alignment [] :i64 8)
+
+(defn rodata-encodings [] :document
+  (document-set (document-keyword :utf-16le-nul)
+                (document-keyword :guid-mixed-endian)
+                (document-keyword :hex-bytes)))
+
+(defn- hex-digit [code :i64] :i64
+  (cond
+    (and (>= code 48) (<= code 57)) (- code 48)
+    (and (>= code 97) (<= code 102)) (- code 87)
+    (and (>= code 65) (<= code 70)) (- code 55)
+    :else -1))
+
+(defn- append-byte [out :document value :i64] :document
+  (document-vector-conj out (document-i64 value)))
+
+(defn- hex-bytes [source :bytes] :document
+  (let [size (bytes-count source)]
+    (if (not= (bit-and size 1) 0) (document-null)
+      (loop [index 0 out (document-vector)]
+        (if (>= index size) out
+          (let [high (hex-digit (bytes-at source index))
+                low (hex-digit (bytes-at source (+ index 1)))]
+            (if (or (< high 0) (< low 0)) (document-null)
+              (recur (+ index 2) (append-byte out (+ (* high 16) low))))))))))
+
+(defn- continuation? [code :i64] :bool
+  (and (>= code 128) (<= code 191)))
+
+(defn- bad-unit [] [:ref :gmir.rodata/unit]
+  (record-new [:ref :gmir.rodata/unit] -1 0))
+
+;; This is UCS-2, matching the original UTF-16 code-unit walk's refusal of
+;; every surrogate. Four-byte UTF-8 scalars are refused, never emitted as pairs.
+(defn- next-unit [source :bytes index :i64] [:ref :gmir.rodata/unit]
+  (let [size (bytes-count source)]
+    (if (or (< index 0) (>= index size)) (bad-unit)
+      (let [lead (bytes-at source index) left (- size index)]
+        (cond
+          (< lead 128) (record-new [:ref :gmir.rodata/unit] lead 1)
+          (and (>= lead 194) (<= lead 223) (>= left 2))
+          (let [b1 (bytes-at source (+ index 1))]
+            (if (continuation? b1)
+              (record-new [:ref :gmir.rodata/unit]
+                (+ (bit-shift-left (bit-and lead 31) 6) (bit-and b1 63)) 2)
+              (bad-unit)))
+          (and (>= lead 224) (<= lead 239) (>= left 3))
+          (let [b1 (bytes-at source (+ index 1)) b2 (bytes-at source (+ index 2))
+                code (+ (bit-shift-left (bit-and lead 15) 12)
+                        (bit-shift-left (bit-and b1 63) 6) (bit-and b2 63))]
+            (if (and (continuation? b1) (continuation? b2) (>= code 2048)
+                     (or (< code 55296) (> code 57343)))
+              (record-new [:ref :gmir.rodata/unit] code 3)
+              (bad-unit)))
+          :else (bad-unit))))))
+
+(defn- ucs2-bytes [source :bytes] :document
+  (loop [index 0 out (document-vector)]
+    (if (>= index (bytes-count source))
+      (append-byte (append-byte out 0) 0)
+      (let [unit (next-unit source index)
+            code (record-get [:ref :gmir.rodata/unit] unit :code)
+            width (record-get [:ref :gmir.rodata/unit] unit :width)]
+        (if (or (< code 0) (<= width 0)) (document-null)
+          (recur (+ index width)
+            (append-byte (append-byte out (bit-and code 255)) (quot code 256))))))))
+
+;; Exact canonical 8-4-4-4-12 shape. No split behavior that drops empty fields.
+(defn- guid-shape? [source :bytes] :bool
+  (and (= (bytes-count source) 36)
+       (= (bytes-at source 8) 45) (= (bytes-at source 13) 45)
+       (= (bytes-at source 18) 45) (= (bytes-at source 23) 45)))
+
+;; GUID first 4/2/2 bytes are little-endian; the final eight retain text order.
+(defn- guid-offset [index :i64] :i64
+  (case index 0 6 1 4 2 2 3 0 4 11 5 9 6 16 7 14
+              8 19 9 21 10 24 11 26 12 28 13 30 14 32 15 34 -1))
+
+(defn- guid-bytes [source :bytes] :document
+  (if (not (guid-shape? source)) (document-null)
+    (loop [index 0 out (document-vector)]
+      (if (= index 16) out
+        (let [offset (guid-offset index)
+              high (hex-digit (bytes-at source offset))
+              low (hex-digit (bytes-at source (+ offset 1)))]
+          (if (or (< high 0) (< low 0)) (document-null)
+            (recur (+ index 1) (append-byte out (+ (* high 16) low)))))))))
+
+;; A document keeps the original full input domain: non-string content and
+;; unknown/non-keyword encodings return null, rather than becoming empty data.
+(defn rodata-bytes [encoding :document content :document] :document
+  (if (or (not= (document-kind content) :string) (not= (document-kind encoding) :keyword))
+    (document-null)
+    (let [text (option-value-of [:option :string] (document-string-value content) "")
+          kind (option-value-of [:option :keyword] (document-keyword-value encoding) :unsupported)
+          source (string-to-utf8 text)]
+      (case kind
+        :utf-16le-nul (ucs2-bytes source)
+        :guid-mixed-endian (guid-bytes source)
+        :hex-bytes (hex-bytes source)
+        (document-null)))))
+
+(defn rodata-content? [encoding :document content :document] :bool
+  (and (document-set-contains? (rodata-encodings) encoding)
+       (not= (document-kind (rodata-bytes encoding content)) :null)))

@@ -1,0 +1,76 @@
+;; Canonical decoder self-check. Not a replacement for the complete GMIR suite.
+(ns kotoba.gmir-rodata-cases
+  {:kotoba/export [cases main]}
+  (:require [kotoba.gmir.rodata :as rodata])
+  (:schemas
+   {:gmir.rodata/case [:record :gmir.rodata/case
+      [[:name :keyword] [:encoding :document] [:content :document] [:expected :document]]]}))
+
+(defn- sample [name :keyword encoding :document content :document expected :document]
+  [:ref :gmir.rodata/case]
+  (record-new [:ref :gmir.rodata/case] name encoding content expected))
+
+(defn- text-case [name :keyword encoding :keyword content :string expected :document]
+  [:ref :gmir.rodata/case]
+  (sample name (document-keyword encoding) (document-string content) expected))
+
+(defn- add [out [:list [:ref :gmir.rodata/case]] value [:ref :gmir.rodata/case]]
+  [:list [:ref :gmir.rodata/case]]
+  (typed-list-conj [:list [:ref :gmir.rodata/case]] out value))
+
+(defn- guid-expected [] :document
+  (document-edn-read "[161 49 27 91 98 149 210 17 142 63 0 160 201 105 114 59]"))
+
+(defn cases [] [:list [:ref :gmir.rodata/case]]
+  (-> (typed-list-new [:list [:ref :gmir.rodata/case]])
+      (add (text-case :ascii :utf-16le-nul "AIUEOS"
+             (document-edn-read "[65 0 73 0 85 0 69 0 79 0 83 0 0 0]")))
+      (add (text-case :empty-ucs2 :utf-16le-nul "" (document-edn-read "[0 0]")))
+      (add (text-case :hiragana :utf-16le-nul "あ" (document-edn-read "[66 48 0 0]")))
+      (add (text-case :astral :utf-16le-nul "hello😀" (document-null)))
+      (add (text-case :upper-guid :guid-mixed-endian "5B1B31A1-9562-11D2-8E3F-00A0C969723B" (guid-expected)))
+      (add (text-case :zero-guid :guid-mixed-endian "00000000-0000-0000-0000-000000000000"
+             (document-edn-read "[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]")))
+      (add (text-case :lower-guid :guid-mixed-endian "5b1b31a1-9562-11d2-8e3f-00a0c969723b" (guid-expected)))
+      (add (text-case :short-guid :guid-mixed-endian "5B1B31A1-9562-11D2-8E3F-00A0C969723" (document-null)))
+      (add (text-case :long-guid :guid-mixed-endian "5B1B31A1-9562-11D2-8E3F-00A0C969723BB" (document-null)))
+      (add (text-case :nonhex-guid :guid-mixed-endian "5B1B31A1-9562-11D2-8E3F-00A0C969723G" (document-null)))
+      (add (text-case :four-fields :guid-mixed-endian "5B1B31A1-9562-11D2-00A0C969723B" (document-null)))
+      (add (text-case :six-fields :guid-mixed-endian "5B1B31A1-9562-11D2-8E3F-00A0-C969723B" (document-null)))
+      (add (text-case :no-separators :guid-mixed-endian "5B1B31A195621ID28E3F00A0C969723B" (document-null)))
+      (add (text-case :trailing-dash :guid-mixed-endian "5B1B31A1-9562-11D2-8E3F-00A0C969723B-" (document-null)))
+      (add (text-case :braces :guid-mixed-endian "{5B1B31A1-9562-11D2-8E3F-00A0C969723B}" (document-null)))
+      (add (text-case :empty-guid :guid-mixed-endian "" (document-null)))
+      (add (text-case :hex :hex-bytes "00FF10" (document-edn-read "[0 255 16]")))
+      (add (text-case :empty-hex :hex-bytes "" (document-vector)))
+      (add (text-case :odd-hex :hex-bytes "abc" (document-null)))
+      (add (text-case :nonhex :hex-bytes "0z" (document-null)))
+      (add (sample :integer-content (document-keyword :utf-16le-nul) (document-i64 42) (document-null)))
+      (add (sample :null-content (document-keyword :utf-16le-nul) (document-null) (document-null)))
+      (add (text-case :unknown-encoding :utf-8 "hello" (document-null)))
+      (add (sample :null-encoding (document-null) (document-string "hello") (document-null)))
+      (add (text-case :lower-hex :hex-bytes "deadbeef" (document-edn-read "[222 173 190 239]")))
+      (add (text-case :two-byte-limit :utf-16le-nul "߿" (document-edn-read "[255 7 0 0]")))
+      (add (text-case :three-byte-start :utf-16le-nul "ࠀ" (document-edn-read "[0 8 0 0]")))
+      (add (text-case :before-surrogates :utf-16le-nul "퟿" (document-edn-read "[255 215 0 0]")))
+      (add (text-case :after-surrogates :utf-16le-nul "" (document-edn-read "[0 224 0 0]")))
+      (add (text-case :bmp-limit :utf-16le-nul "￿" (document-edn-read "[255 255 0 0]")))
+      (add (text-case :embedded-zero :utf-16le-nul "a\u0000b" (document-edn-read "[97 0 0 0 98 0 0 0]")))
+      (add (text-case :nonascii-hex :hex-bytes "é0" (document-null)))))
+
+(defn main [] :i64
+  (let [all (cases)
+        encodings (document-set (document-keyword :utf-16le-nul)
+                               (document-keyword :guid-mixed-endian) (document-keyword :hex-bytes))]
+    (if (or (not= (rodata/rodata-alignment) 8)
+            (not (document-equal? (rodata/rodata-encodings) encodings))
+            (not= (vector-count all) 32)) 100
+      (loop [index 0]
+        (if (>= index (vector-count all)) 0
+          (let [test (typed-list-nth [:list [:ref :gmir.rodata/case]] all index)
+                encoding (record-get [:ref :gmir.rodata/case] test :encoding)
+                content (record-get [:ref :gmir.rodata/case] test :content)
+                expected (record-get [:ref :gmir.rodata/case] test :expected)]
+            (if (and (document-equal? (rodata/rodata-bytes encoding content) expected)
+                     (= (rodata/rodata-content? encoding content) (not= (document-kind expected) :null)))
+              (recur (+ index 1)) (+ index 1))))))))

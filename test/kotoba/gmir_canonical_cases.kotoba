@@ -1,0 +1,23 @@
+;; Whole new canonical self-check entries. Source only, not a registered gate.
+;; Full upstream corpus and actual native qualification remain required.
+(ns kotoba.gmir-canonical-cases
+  {:kotoba/export [main large-main]}
+  (:require [kotoba.gmir-rodata-cases :as rodata]
+            [kotoba.gmir-catalog-cases :as catalog]
+            [kotoba.gmir-identity-cases :as identity]
+            [kotoba.gmir-validation-cases :as validation]))
+
+(defn main [] :i64
+  (let [literal (arena-scope (rodata/main))]
+    (if (not= literal 0) (+ 1000 literal)
+      (let [tables (arena-scope (catalog/main))]
+        (if (not= tables 0) (+ 2000 tables)
+          (let [names (arena-scope (identity/main))]
+            (if (not= names 0) (+ 3000 names)
+              (let [programs (arena-scope (validation/main))]
+                (if (= programs 0) 0 (+ 4000 programs))))))))))
+(defn large-main [] :i64
+  (let [literal (arena-scope (rodata/large-internal-case))]
+    (if (not= literal 0) (+ 1000 literal)
+      (let [collection (arena-scope (identity/large-collection-case))]
+        (if (= collection 0) 0 (+ 2000 collection))))))

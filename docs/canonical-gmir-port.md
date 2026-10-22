@@ -15,8 +15,9 @@ an accepted replacement.
 
 `src/kotoba/gmir/rodata.kotoba` is a canonical source candidate for the
 three encodings, alignment, byte decoding and content predicate. Public data
-values become typed zero-argument accessors. The owning root still uses its
-reference implementation; this component has not replaced it or its callers.
+values become typed zero-argument accessors. This draft now has a canonical
+owning root delegating to the component; owning main and existing native
+callers have not been switched or qualified.
 
 A source review found that the first draft's generic document-vector result
 could not represent literals beyond the unchanged **32-item document
@@ -111,8 +112,8 @@ The original four suites remain unchanged and required.
 ## Identity/scalar boundary and paged input/refusal data
 
 `node.kotoba`, `identity.kotoba` and `outcome.kotoba` add source candidates
-for the five remaining identity/scalar exports and the full-data refusal
-carrier. This still does not implement or wire `validate!`.
+for the five identity/scalar exports and the full-data refusal carrier.
+The canonical root now delegates to these and the validator below.
 
 The nominal input carries scalar kind/bits, separate namespace/name, raw
 text chunks and paged children. No program or long literal enters a generic
@@ -154,9 +155,81 @@ It checks a 33-child collection and provides a separate full-page rollover
 entry with 16,385 children. All of this is uncompiled/unexecuted. The node
 constructors are data builders: tags alone do not prove a valid reader value,
 well-formed map/set/collection, complete IR admission or authority. Full
-reader/tag/UTF-8/shape admission and invalid-representation refusal remain
-part of root/caller integration. Native allocation/copy/fuel costs remain
+reader/tag/UTF-8/shape integration and invalid-representation parity remain
+part of full qualification; the validator below adds a final representation
+check for semantically admitted input. Native allocation/copy/fuel costs remain
 unqualified.
+
+## Owning root and whole-program validator source
+
+`src/kotoba/gmir.kotoba` now exposes every original public name, delegating to
+the literal, catalog, identity and `validation.kotoba` components. The legacy
+root and four suites remain byte-identical provenance. This is a canonical
+source candidate with explicit typed migration APIs, not a release or a
+claim that legacy callers, source readers, locks and Definition CIDs have
+been migrated. Data values are zero-argument accessors; `vreg`/`validate!`
+return typed results and literal/format decoders return options. Callers
+must propagate all refusal facts and preserve nominal identity/value kinds.
+
+The validator source implements the complete instruction pass, duplicate
+labels/unresolved targets, phi checks and v3 function/module linkage in the
+reference's order. It reuses the full keyset/runtime/x86 tables. All 32
+reference problem symbols are present across constructor/validator source;
+that inventory is not proof of equivalent conditions or runtime behavior.
+
+- Instructions retain closed version/keysets, non-nil general register
+  checks, indexed/return registers, call/runtime/x86/capability arities,
+  incoming shape, exact i64 constants, data/rodata/function addresses,
+  nonnegative indices, every memory ceiling and label identity.
+- The reference's generic `keep` skips an explicit nil register field. This
+  existing admission behavior is transcribed; repairing it requires a
+  separate reviewed change. A final representation check rejects hidden
+  namespace/name/child payload on atom tags or invalid canonical text.
+- Phi values retain block-entry placement, at least two distinct incoming
+  predecessors, equality with unconditional-jump predecessors, critical-edge
+  refusal and fallthrough refusal. An unlabeled jump's nil predecessor is
+  dropped as the reference's `keep` does. Full join/incoming/jumps data is
+  retained as nominal map/sets on mismatch.
+- Modules retain exact shapes, valid unique names and entry resolution
+  before per-function validation. Each function checks arity, all code,
+  argument index bounds/distinctness, function-address linkage and call/tail
+  arity in order. Diagnostics retain complete names, labels, indices,
+  instructions, calls, expected arity and sorted declared names. Sorting
+  compares namespace presence, namespace and name in UTF-16 order.
+- Success returns the original program. Semantic failure returns phase,
+  problem, message and full original/derived instruction data. Only after a
+  semantic success is the nominal tree checked for malformed representation;
+  the additional `:non-canonical-value` refusal retains the offending node.
+  Constructors/tags alone do not establish admission or authority.
+
+`test/kotoba/gmir_validation_cases.kotoba` adds native self-check source:
+all 92 instruction rows with positive, each missing key and extra-field
+cases; invalid and nil general-register fields; indexed/return registers;
+every applicable window tier and invalid memory maximum; all 37 runtime and
+55 x86 arities with correct/incorrect argument counts; all eight existing
+capability kinds with wire/argument boundaries; and 60 fixed fixtures for
+flat/module/phi/linkage/refusal-order/representation/Unicode diagnostics.
+Accepted programs and complete refusal payloads are compared recursively,
+including bytes, bits, namespace/name and every child; map/set order is not
+used as meaning. Arena scopes contain each independent self-check's data
+and return only a scalar result. That scope use and resource behavior still
+require native execution and does not qualify production cleanup or limits.
+
+No self-check, compiler, interpreter, generator or reference oracle has been
+run. The source-data inspector only reads forms/Git data: it checks root
+exports/arities, copied table data, problem-symbol inventory, register field
+order, fixture labels/operand keys and local/import/type-position/lexical
+shapes. It is not the owning reader or a type/target/runtime gate. Full
+upstream-corpus mapping and differential/parity/resource/authority execution
+remain required; these new cases are not declared a completed replacement
+for the original four suites.
+
+`test/kotoba/gmir_canonical_cases.kotoba` provides `main` that calls all four
+new literal/catalog/identity/validator entries and propagates their failure
+codes. `large-main` separately calls the 8 MiB internal literal and 16,385-
+child rollover cases. Every entry remains uncompiled/unexecuted; neither is
+a registered CI check, certified harness or replacement for the complete
+upstream corpus and whole native execution/resource evidence.
 
 ## Additional downstream carrier gap
 
@@ -172,13 +245,14 @@ changed in this source step.
 
 ## Remaining whole-component work
 
-The root canonical GMIR module must wire the 27 public names represented
-by the literal/catalog/identity candidates and implement the whole-program
-`validate!` export. All root
-instruction checks, phi predecessor/critical-edge/fallthrough rules and
-module linkage/refusal facts still require implementation. No table-only
-slice is whole GMIR. In addition, all native consumers of data accessors/results, proposed capability kinds
-8..11 and matching signature/type/value/lowering/ABI are still required.
+The draft now has all public names and the complete validator source wired
+at its owning root. Whole-component acceptance remains open: target reader
+and type admission, every upstream regression, native execution and all
+caller/data/refusal/CID adapters must be verified. Native source readers
+must preserve wide integer and namespace/name data without wrapping,
+flattening or a printed-spelling round trip. The full artifact/provider/
+packager path and proposed capability kinds 8..11 with matching signature,
+type, value, lowering and ABI are still required.
 An existing language-side mechanical `.kotoba` projection contains an empty
 `i64-value?` body and host forms. It is migration inventory, not an owning
 canonical implementation or native proof. Do not fill it with stubs or use

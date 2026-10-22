@@ -1,7 +1,7 @@
 ;; Canonical identity/scalar boundary. Root/caller/CID migration and native
 ;; admission/execution are not established by this source candidate.
 (ns kotoba.gmir.identity
-  {:kotoba/export [vreg vreg? label? function-id? i64-value? integer-i64 nonnegative-integer?]}
+  {:kotoba/export [vreg vreg? label? function-id? i64-value? integer-i64 nonnegative-integer? integer-form?]}
   (:require [kotoba.gmir.node :as node] [kotoba.gmir.outcome :as outcome]))
 
 (defn- digit? [byte :i64] :bool (and (>= byte 48) (<= byte 57)))
@@ -35,6 +35,8 @@
     (option-none-of [:option :i64])))
 (defn i64-value? [value [:ref :gmir.node/value]] :bool
   (option-some?-of [:option :i64] (integer-i64 value)))
+(defn integer-form? [value [:ref :gmir.node/value]] :bool
+  (or (= (node/kind value) :i64) (and (= (node/kind value) :integer) (decimal? (node/name-of value)))))
 
 ;; A nonnegative integer is not restricted to i64. Preserve very large
 ;; indices as decimal text, normalize zero/sign/leading zeros, and let actual

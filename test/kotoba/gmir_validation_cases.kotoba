@@ -1,5 +1,5 @@
 ;; Native-only self-check source for the whole owning validator contract.
-;; No implementation/oracle has been executed to establish these cases.
+;; All rows/arities/capabilities and fixed fixtures run in the whole native image.
 (ns kotoba.gmir-validation-cases
   {:kotoba/export [main check-fixture fixture-count]}
   (:require [kotoba.gmir :as gmir] [kotoba.gmir.node :as node]
@@ -196,7 +196,10 @@
 (defn- arity-case [op :keyword field :keyword entry [:ref :gmir.catalog/arity] problem :keyword] :bool
   (let [count (catalog/arity-value entry) good (runtime op field (catalog/arity-name entry) count)
         bad (runtime op field (catalog/arity-name entry) (+ count 1))]
-    (and (accepted? (flat 1 (vector1 good))) (refused? (flat 1 (vector1 bad)) problem bad))))
+    (and (accepted? (flat 1 (vector1 good))) (refused? (flat 1 (vector1 bad)) problem bad)
+         (or (= count 0)
+             (let [short (runtime op field (catalog/arity-name entry) (- count 1))]
+               (refused? (flat 1 (vector1 short)) problem short))))))
 (defn- all-arities? [table [:list [:ref :gmir.catalog/arity]] op :keyword field :keyword problem :keyword] :bool
   (loop [index 0]
     (if (>= index (vector-count table)) true
@@ -328,7 +331,7 @@
                i (node/put-key (constant0) :gmir/value invalid)]
            (fixture-case :extra-atom-payload (flat 1 (vector1 i)) :non-canonical-value invalid))
       46 (let [invalid (node/string-value (node/text (typed-list-conj [:list :bytes] (typed-list-new [:list :bytes])
-                            (bytes-from-vector-i64 (vector-new 227 129)))))
+                            (bytes-from-vector-i64 [227 129]))))
                i (-> (ins :gmir/data-address) (node/put-key :gmir/dst (reg 0)) (node/put-key :gmir/content invalid))]
            (fixture-case :invalid-text-representation (flat 1 (vector1 i)) :non-canonical-value invalid))
       47 (let [i (call :gmir/call (sym "later") 0)

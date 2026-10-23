@@ -83,39 +83,39 @@
 (defn chunk-cases [] [:list [:ref :gmir.rodata/case]]
   (-> (typed-list-new [:list [:ref :gmir.rodata/case]])
       (add (raw-case :split-two :utf-16le-nul
-        (-> (empty-chunks) (chunk (bytes-from-vector-i64 (vector-new 194)))
-            (chunk (bytes-empty)) (chunk (bytes-from-vector-i64 (vector-new 162))))
+        (-> (empty-chunks) (chunk (bytes-from-vector-i64 [194]))
+            (chunk (bytes-empty)) (chunk (bytes-from-vector-i64 [162])))
         (document-edn-read "[162 0 0 0]")))
       (add (raw-case :split-three :utf-16le-nul
-        (-> (empty-chunks) (chunk (bytes-empty)) (chunk (bytes-from-vector-i64 (vector-new 227)))
-            (chunk (bytes-from-vector-i64 (vector-new 129))) (chunk (bytes-empty))
-            (chunk (bytes-from-vector-i64 (vector-new 130))) (chunk (bytes-empty)))
+        (-> (empty-chunks) (chunk (bytes-empty)) (chunk (bytes-from-vector-i64 [227]))
+            (chunk (bytes-from-vector-i64 [129])) (chunk (bytes-empty))
+            (chunk (bytes-from-vector-i64 [130])) (chunk (bytes-empty)))
         (document-edn-read "[66 48 0 0]")))
       (add (raw-case :split-astral :utf-16le-nul
-        (-> (empty-chunks) (chunk (bytes-from-vector-i64 (vector-new 240 159)))
-            (chunk (bytes-from-vector-i64 (vector-new 152 128)))) (document-null)))
+        (-> (empty-chunks) (chunk (bytes-from-vector-i64 [240 159]))
+            (chunk (bytes-from-vector-i64 [152 128]))) (document-null)))
       (add (raw-case :surrogate-high :utf-16le-nul
-        (-> (empty-chunks) (chunk (bytes-from-vector-i64 (vector-new 237)))
-            (chunk (bytes-from-vector-i64 (vector-new 160 128)))) (document-null)))
+        (-> (empty-chunks) (chunk (bytes-from-vector-i64 [237]))
+            (chunk (bytes-from-vector-i64 [160 128]))) (document-null)))
       (add (raw-case :surrogate-low :utf-16le-nul
-        (chunk (empty-chunks) (bytes-from-vector-i64 (vector-new 237 191 191))) (document-null)))
+        (chunk (empty-chunks) (bytes-from-vector-i64 [237 191 191])) (document-null)))
       (add (raw-case :overlong-two :utf-16le-nul
-        (chunk (empty-chunks) (bytes-from-vector-i64 (vector-new 192 175))) (document-null)))
+        (chunk (empty-chunks) (bytes-from-vector-i64 [192 175])) (document-null)))
       (add (raw-case :overlong-three :utf-16le-nul
-        (-> (empty-chunks) (chunk (bytes-from-vector-i64 (vector-new 224 128)))
-            (chunk (bytes-from-vector-i64 (vector-new 175)))) (document-null)))
+        (-> (empty-chunks) (chunk (bytes-from-vector-i64 [224 128]))
+            (chunk (bytes-from-vector-i64 [175]))) (document-null)))
       (add (raw-case :continuation-only :utf-16le-nul
-        (chunk (empty-chunks) (bytes-from-vector-i64 (vector-new 128))) (document-null)))
+        (chunk (empty-chunks) (bytes-from-vector-i64 [128])) (document-null)))
       (add (raw-case :truncated-two :utf-16le-nul
-        (-> (empty-chunks) (chunk (bytes-from-vector-i64 (vector-new 194)))
+        (-> (empty-chunks) (chunk (bytes-from-vector-i64 [194]))
             (chunk (bytes-empty))) (document-null)))
       (add (raw-case :truncated-three :utf-16le-nul
-        (-> (empty-chunks) (chunk (bytes-from-vector-i64 (vector-new 227)))
-            (chunk (bytes-from-vector-i64 (vector-new 129)))) (document-null)))
+        (-> (empty-chunks) (chunk (bytes-from-vector-i64 [227]))
+            (chunk (bytes-from-vector-i64 [129]))) (document-null)))
       (add (raw-case :bad-continuation :utf-16le-nul
-        (chunk (empty-chunks) (bytes-from-vector-i64 (vector-new 227 40 130))) (document-null)))
+        (chunk (empty-chunks) (bytes-from-vector-i64 [227 40 130])) (document-null)))
       (add (raw-case :invalid-lead :utf-16le-nul
-        (chunk (empty-chunks) (bytes-from-vector-i64 (vector-new 255))) (document-null)))
+        (chunk (empty-chunks) (bytes-from-vector-i64 [255])) (document-null)))
       (add (raw-case :split-hex :hex-bytes
         (-> (empty-chunks) (chunk (string-to-utf8 "0")) (chunk (bytes-empty))
             (chunk (string-to-utf8 "0F")) (chunk (string-to-utf8 "F1"))
@@ -131,8 +131,8 @@
       (add (raw-case :split-odd-hex :hex-bytes
         (-> (empty-chunks) (chunk (string-to-utf8 "ab")) (chunk (string-to-utf8 "c"))) (document-null)))
       (add (raw-case :split-nonascii-hex :hex-bytes
-        (-> (empty-chunks) (chunk (bytes-from-vector-i64 (vector-new 195)))
-            (chunk (bytes-from-vector-i64 (vector-new 169)))) (document-null)))))
+        (-> (empty-chunks) (chunk (bytes-from-vector-i64 [195]))
+            (chunk (bytes-from-vector-i64 [169]))) (document-null)))))
 
 (defn- matches-small? [actual [:option [:ref :gmir.rodata/decoded]] expected :document] :bool
   (if (= (document-kind expected) :null)
@@ -212,7 +212,7 @@
       (option-some?-of [:option [:ref :gmir.rodata/decoded]]
         (rodata/rodata-bytes (rodata/keyword-input :utf-16le-nul)
           (rodata/chunks-input (-> (repeated-chunks (string-to-utf8 ascii) 1)
-            (chunk (bytes-from-vector-i64 (vector-new 227 129))))))) 8
+            (chunk (bytes-from-vector-i64 [227 129])))))) 8
       (option-some?-of [:option [:ref :gmir.rodata/decoded]]
         (rodata/rodata-bytes (rodata/keyword-input :hex-bytes)
           (rodata/chunks-input (-> (repeated-chunks (string-to-utf8 hex) 1)

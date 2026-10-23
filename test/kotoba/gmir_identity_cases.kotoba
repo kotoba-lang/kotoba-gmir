@@ -1,4 +1,4 @@
-;; Canonical boundary self-check source. No compiler/runtime claim.
+;; Canonical boundary native self-checks; public target qualification remains open.
 (ns kotoba.gmir-identity-cases
   {:kotoba/export [main large-collection-case]}
   (:require [kotoba.gmir.node :as node] [kotoba.gmir.identity :as identity]
@@ -131,14 +131,14 @@
   (let [value (node/text-compare-utf16 (node/string-text left) (node/string-text right))]
     (and (option-some?-of [:option :i64] value) (= (option-value-of [:option :i64] value 2) expected))))
 (defn- unicode? [] :bool
-  (and (raw-valid? (vector-new) true) (raw-valid? (vector-new 0 65 127) true)
-       (raw-valid? (vector-new 194 128) true) (raw-valid? (vector-new 223 191) true)
-       (raw-valid? (vector-new 224 160 128) true) (raw-valid? (vector-new 239 191 191) true)
-       (raw-valid? (vector-new 240 144 128 128) true) (raw-valid? (vector-new 244 143 191 191) true)
-       (raw-valid? (vector-new 192 175) false) (raw-valid? (vector-new 224 128 175) false)
-       (raw-valid? (vector-new 240 128 128 175) false) (raw-valid? (vector-new 237 160 128) false)
-       (raw-valid? (vector-new 244 144 128 128) false) (raw-valid? (vector-new 128) false)
-       (raw-valid? (vector-new 240 159 152) false) (raw-valid? (vector-new 255) false)
+  (and (raw-valid? (vector-new) true) (raw-valid? [0 65 127] true)
+       (raw-valid? [194 128] true) (raw-valid? [223 191] true)
+       (raw-valid? [224 160 128] true) (raw-valid? [239 191 191] true)
+       (raw-valid? [240 144 128 128] true) (raw-valid? [244 143 191 191] true)
+       (raw-valid? [192 175] false) (raw-valid? [224 128 175] false)
+       (raw-valid? [240 128 128 175] false) (raw-valid? [237 160 128] false)
+       (raw-valid? [244 144 128 128] false) (raw-valid? [128] false)
+       (raw-valid? [240 159 152] false) (raw-valid? [255] false)
        (ordered? "" "" 0) (ordered? "a" "aa" -1) (ordered? "aa" "a" 1)
        (ordered? "😀" "" -1) (ordered? "😀" "😁" -1) (ordered? "😀" "𠀀" -1)
        (ordered? "􏿿" "￿" -1)))
@@ -146,15 +146,15 @@
   (let [split (node/text (-> (typed-list-new [:list :bytes])
                 (byte-chunk (string-to-utf8 "A"))
                 (byte-chunk (bytes-empty))
-                (byte-chunk (bytes-from-vector-i64 (vector-new 227)))
-                (byte-chunk (bytes-from-vector-i64 (vector-new 129 130)))
+                (byte-chunk (bytes-from-vector-i64 [227]))
+                (byte-chunk (bytes-from-vector-i64 [129 130]))
                 (byte-chunk (string-to-utf8 "B"))))
         part (node/text-slice split 1 4)
         map (-> (node/empty-map) (node/put-key :gmir/version (node/i64-value 1))
                                (node/put-key :present (node/nil-value)))
         updated (node/put-key map :gmir/version (node/i64-value 3))
         malformed (node/text (typed-list-conj [:list :bytes] (typed-list-new [:list :bytes])
-                              (bytes-from-vector-i64 (vector-new 237 160 128))))
+                              (bytes-from-vector-i64 [237 160 128])))
         order (node/text-compare-utf16 (node/string-text "😀") (node/string-text ""))
         decimal (node/integer-value (node/text (-> (typed-list-new [:list :bytes])
                     (byte-chunk (string-to-utf8 "-922337203"))

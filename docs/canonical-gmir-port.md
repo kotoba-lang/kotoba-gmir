@@ -152,7 +152,8 @@ The identity self-check source includes 25 scalar cases, constructor and
 predicate refusals, namespace/name ambiguity, complete refusal facts, text
 slicing and chunk boundaries, 16 UTF-8 vectors and seven text-order cases.
 It checks a 33-child collection and provides a separate full-page rollover
-entry with 16,385 children. All of this is uncompiled/unexecuted. The node
+entry with 16,385 children. All of these native entries now execute successfully;
+see the exact receipt below. The node
 constructors are data builders: tags alone do not prove a valid reader value,
 well-formed map/set/collection, complete IR admission or authority. Full
 reader/tag/UTF-8/shape integration and invalid-representation parity remain
@@ -212,11 +213,12 @@ flat/module/phi/linkage/refusal-order/representation/Unicode diagnostics.
 Accepted programs and complete refusal payloads are compared recursively,
 including bytes, bits, namespace/name and every child; map/set order is not
 used as meaning. Arena scopes contain each independent self-check's data
-and return only a scalar result. That scope use and resource behavior still
-require native execution and does not qualify production cleanup or limits.
+and return only a scalar result. They have now been executed on the native
+selfhost route; public resource/authority qualification remains separate.
 
-No self-check, compiler, interpreter, generator or reference oracle has been
-run. The source-data inspector only reads forms/Git data: it checks root
+The complete new self-check image has been compiled and executed natively.
+No legacy host/reference oracle was run. The separate source-data inspector
+only reads forms/Git data: it checks root
 exports/arities, copied table data, problem-symbol inventory, register field
 order, fixture labels/operand keys and local/import/type-position/lexical
 shapes. It is not the owning reader or a type/target/runtime gate. Full
@@ -227,9 +229,9 @@ for the original four suites.
 `test/kotoba/gmir_canonical_cases.kotoba` provides `main` that calls all four
 new literal/catalog/identity/validator entries and propagates their failure
 codes. `large-main` separately calls the 8 MiB internal literal and 16,385-
-child rollover cases. Every entry remains uncompiled/unexecuted; neither is
-a registered CI check, certified harness or replacement for the complete
-upstream corpus and whole native execution/resource evidence.
+child rollover cases. All eight component/aggregate entries now execute with
+exit zero. These are not registered CI checks, a certified harness, or a claim
+of assertion-by-assertion replacement of the four historical suites.
 
 ## Additional downstream carrier gap
 
@@ -282,3 +284,30 @@ public table. Pure scalar helpers reclaim only internal temporaries, map-key
 comparison preserves namespace presence and exact bytes, and Option fallbacks
 are lazy. These are production-integration results, not execution of every
 GMIR historical suite or public CLI/target/resolver/CID admission.
+
+## Whole GMIR native corpus, 2026-10-23
+
+[correctness.json](evidence/native-selfhost-20261023/correctness.json) records
+all 12 production/test inputs, both source roots and their exact KSL1 SHA-256
+pins. Amu selfhost G7 compiles and links the complete image; all eight exports
+exit zero: the ordinary aggregate, four components, two large components and
+the whole large aggregate. The same native compiler/packager reruns all eight
+MIR ordinary/large entries after the decoder update and they also exit zero.
+
+Literal checks include all 32 fixed and 18 split-chunk cases, ten long cases,
+and every output byte of an 8 MiB decoded literal. Identity checks include
+16,385 children and full page rollover. Validation checks retain all 92
+instruction rows and missing/extra fields, all 37 runtime and 55 privileged
+arities (both short and long refusal directions), eight capability kinds and
+60 full-data fixtures. Nonempty `vector-new` fixtures were corrected to the
+native primitive's declared vector-literal form; byte values/cases are kept.
+
+The initial rodata run exhausted the unchanged pair arena. A private
+three-word scalar cursor now advances through immutable input chunks, and
+only a completed output piece gets a cursor record. No per-byte nominal
+record is retained. Empty chunks, split UTF-8, malformed/astral/surrogate
+refusal, hex/GUID byte ordering and terminators remain checked. All original
+allocator limits and capability grants are unchanged. This is native corpus
+execution, not a public CI/controller registration or full legacy-assertion,
+caller/reader/Definition CID qualification. The historical source and all
+four suites remain byte-identical.

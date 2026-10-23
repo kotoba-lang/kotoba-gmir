@@ -19,3 +19,14 @@ Do not add or run tests unless the user asks to test or verify implementation.
 Native source, compilation, execution, corpus parity, artifact admission and
 downstream immutable pins are separate evidence. Missing native gates stay
 open; do not register a success placeholder or restore an obsolete host gate.
+
+## Retired CI and current evidence
+
+The Java 21/Clojure workflow (`.github/workflows/test.yml`) was removed in
+PR #41. It is not retained disabled and must not return as a fallback. No
+public native CDCI gate/controller is registered yet. Internal native Amu
+selfhost receipts cover all four canonical component entries, the ordinary
+and large aggregates, all instruction rows/arities/capability kinds, long
+rodata and paged collection cases. Historical host-suite assertion parity,
+caller/reader integration, public target/profile/seal, authority/resource
+qualification and downstream main/lock/CID remain separate open checks.
